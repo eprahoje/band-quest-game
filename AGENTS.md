@@ -13,6 +13,7 @@ This repository implements the Band Quest features documented in `../band-quest-
 - Do not invent requirements when a question is still open; update the docs flow instead.
 - Keep implementation names and folder structure in English.
 - Prefer small, incremental changes that map cleanly back to a single documented feature iteration.
+- Always create explicit plans and document your actions whenever you execute creation or editing of files. Use the chat response to clarify the plan before/during execution, and log updates appropriately.
 - If a feature is still ambiguous, stop and request clarification or feed the uncertainty back into the docs.
 
 ## Development expectation
