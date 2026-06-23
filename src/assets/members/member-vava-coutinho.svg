@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Vavá Coutinho — Teclado">
+  <!-- Vavá Coutinho (Teclado) · accent token bq-info #5aa9ff -->
+  <ellipse cx="48" cy="39" rx="17" ry="14" fill="#8d877e"/>
+  <path d="M12 96C12 77 29 69 48 69s36 8 36 27Z" fill="#5aa9ff"/>
+  <rect x="42" y="54" width="12" height="18" fill="#d9a87f"/>
+  <ellipse cx="48" cy="46" rx="16" ry="19" fill="#d9a87f"/>
+  <path d="M33 50Q34 66 48 69Q62 66 63 50Q56 61 48 61Q40 61 33 50Z" fill="#8d877e"/>
+  <path d="M37 41q4-2 8 0" fill="none" stroke="#8d877e" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M51 41q4-2 8 0" fill="none" stroke="#8d877e" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="41" cy="46.5" r="2.2" fill="#2a201a"/>
+  <circle cx="55" cy="46.5" r="2.2" fill="#2a201a"/>
+  <path d="M44 56h8" fill="none" stroke="#7d614e" stroke-width="2" stroke-linecap="round"/>
+</svg>

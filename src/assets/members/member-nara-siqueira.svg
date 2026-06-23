@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Nara Siqueira — Baixo">
+  <!-- Nara Siqueira (Baixo) · accent token bq-stat-cash #46d39a -->
+  <path d="M34 35Q48 21 62 35Q48 29 34 35Z" fill="#1b1b20"/>
+  <path d="M12 96C12 77 29 69 48 69s36 8 36 27Z" fill="#46d39a"/>
+  <rect x="42" y="54" width="12" height="18" fill="#4f3527"/>
+  <ellipse cx="48" cy="46" rx="16" ry="19" fill="#4f3527"/>
+  <path d="M37 40q4-2.5 8 0" fill="none" stroke="#1b1b20" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M51 40q4-2.5 8 0" fill="none" stroke="#1b1b20" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="41" cy="46" r="2.3" fill="#120c08"/>
+  <circle cx="55" cy="46" r="2.3" fill="#120c08"/>
+  <path d="M43 55h10" fill="none" stroke="#3a261b" stroke-width="2" stroke-linecap="round"/>
+</svg>

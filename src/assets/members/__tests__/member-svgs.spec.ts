@@ -27,6 +27,14 @@ describe('member SVGs', () => {
     expect(svgFiles.length).toBeGreaterThan(0)
   })
 
+  it('every cast member has a matching SVG', () => {
+    const present = new Set(
+      svgFiles.map((f) => f.replace(/^member-/, '').replace(/\.svg$/, '')),
+    )
+    const missing = CAST_SLUGS.filter((slug) => !present.has(slug))
+    expect(missing, `missing SVGs: ${missing.join(', ')}`).toHaveLength(0)
+  })
+
   it.each(svgFiles)('%s is well-formed and on-spec', (file) => {
     const content = readFileSync(resolve(membersDir, file), 'utf-8')
     const doc = parse(content)
@@ -40,7 +48,10 @@ describe('member SVGs', () => {
     // 2. square viewBox
     const vb = svg.getAttribute('viewBox')
     expect(vb, 'missing viewBox').toBeTruthy()
-    const [, , w, h] = vb!.trim().split(/[\s,]+/).map(Number)
+    const parts = (vb ?? '').trim().split(/[\s,]+/).map(Number)
+    expect(parts, 'viewBox must have 4 numbers').toHaveLength(4)
+    const w = parts[2] as number
+    const h = parts[3] as number
     expect(w).toBeGreaterThan(0)
     expect(w).toBe(h)
 
