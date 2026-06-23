@@ -15,12 +15,28 @@ export interface BandMember {
   skill: number // 0–100
 }
 
+export type EventCategory =
+  | 'show'
+  | 'recording'
+  | 'tour'
+  | 'negotiation'
+  | 'milestone'
+  | 'setback'
+
+export interface GameEvent {
+  id: string
+  turn: number
+  category: EventCategory
+  message: string
+}
+
 export interface GameState {
   bandName: string
   genre: string
   originTrait: string
   stats: BandStats
   members: BandMember[]
+  events: GameEvent[]
   turn: number
   currentView: 'start' | 'game'
 }
@@ -41,17 +57,26 @@ export const useGameStore = defineStore('game', () => {
 
   const stats = ref<BandStats>({ ...INITIAL_STATS })
   const members = ref<BandMember[]>([])
+  const events = ref<GameEvent[]>([])
+
+  let eventSeq = 0
 
   const isGameStarted = computed(() => currentView.value === 'game')
   const isFatigued = computed(() => stats.value.fatigue >= 80)
+
+  // Eventos mais recentes primeiro, para renderização direta na timeline.
+  const recentEvents = computed(() => [...events.value].reverse())
 
   function startGame(payload: { bandName: string; genre: string; originTrait: string }) {
     bandName.value = payload.bandName
     genre.value = payload.genre
     originTrait.value = payload.originTrait
     stats.value = { ...INITIAL_STATS }
+    events.value = []
+    eventSeq = 0
     turn.value = 1
     currentView.value = 'game'
+    logEvent('milestone', `${payload.bandName} foi formada. Boa sorte!`)
   }
 
   function applyStatDelta(delta: Partial<BandStats>) {
@@ -64,6 +89,15 @@ export const useGameStore = defineStore('game', () => {
       s.fatigue = Math.max(0, Math.min(100, s.fatigue + delta.fatigue))
   }
 
+  function logEvent(category: EventCategory, message: string) {
+    events.value.push({
+      id: String(++eventSeq),
+      turn: turn.value,
+      category,
+      message,
+    })
+  }
+
   function advanceTurn() {
     turn.value++
   }
@@ -74,6 +108,8 @@ export const useGameStore = defineStore('game', () => {
     originTrait.value = ''
     stats.value = { ...INITIAL_STATS }
     members.value = []
+    events.value = []
+    eventSeq = 0
     turn.value = 0
     currentView.value = 'start'
   }
@@ -86,10 +122,13 @@ export const useGameStore = defineStore('game', () => {
     currentView,
     stats,
     members,
+    events,
     isGameStarted,
     isFatigued,
+    recentEvents,
     startGame,
     applyStatDelta,
+    logEvent,
     advanceTurn,
     resetGame,
   }

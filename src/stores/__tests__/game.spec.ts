@@ -108,6 +108,59 @@ describe('game store', () => {
       expect(store.stats.fans).toBe(0)
       expect(store.stats.fatigue).toBe(0)
       expect(store.bandName).toBe('')
+      expect(store.events).toEqual([])
+    })
+  })
+
+  describe('events', () => {
+    it('starts with no events before a game begins', () => {
+      const store = useGameStore()
+      expect(store.events).toEqual([])
+      expect(store.recentEvents).toEqual([])
+    })
+
+    it('logs an opening milestone when the game starts', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'The Fuzz', genre: 'Rock', originTrait: 'Garagem' })
+      expect(store.events).toHaveLength(1)
+      expect(store.events[0]!.category).toBe('milestone')
+      expect(store.events[0]!.message).toContain('The Fuzz')
+      expect(store.events[0]!.turn).toBe(1)
+    })
+
+    it('appends events with the current turn and a unique id', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.logEvent('show', 'Primeiro show!')
+      store.advanceTurn()
+      store.logEvent('recording', 'Gravamos a demo.')
+      expect(store.events).toHaveLength(3)
+      const ids = store.events.map((e) => e.id)
+      expect(new Set(ids).size).toBe(3)
+      expect(store.events[1]).toMatchObject({ category: 'show', turn: 1 })
+      expect(store.events[2]).toMatchObject({ category: 'recording', turn: 2 })
+    })
+
+    it('recentEvents returns events most-recent-first without mutating source', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.logEvent('show', 'A')
+      store.logEvent('setback', 'B')
+      const recent = store.recentEvents
+      expect(recent[0]!.message).toBe('B')
+      expect(recent[1]!.message).toBe('A')
+      expect(recent[2]!.category).toBe('milestone')
+      // ordem original preservada
+      expect(store.events[0]!.category).toBe('milestone')
+    })
+
+    it('clears events and id sequence on a new game', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'A', genre: 'Rock', originTrait: 'Garagem' })
+      store.logEvent('show', 'old')
+      store.startGame({ bandName: 'B', genre: 'Pop', originTrait: 'Universitários' })
+      expect(store.events).toHaveLength(1)
+      expect(store.events[0]!.id).toBe('1')
     })
   })
 })
