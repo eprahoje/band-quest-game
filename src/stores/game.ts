@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { createDefaultRoster, type BandMember } from '@/data/cast'
 
 export interface BandStats {
   reputation: number // 0–100
@@ -8,12 +9,7 @@ export interface BandStats {
   fatigue: number // 0–100; above 80 starts blocking actions
 }
 
-export interface BandMember {
-  id: string
-  name: string
-  role: string
-  skill: number // 0–100
-}
+export type { BandMember }
 
 export type EventCategory =
   | 'show'
@@ -72,6 +68,7 @@ export const useGameStore = defineStore('game', () => {
     genre.value = payload.genre
     originTrait.value = payload.originTrait
     stats.value = { ...INITIAL_STATS }
+    members.value = createDefaultRoster()
     events.value = []
     eventSeq = 0
     turn.value = 1

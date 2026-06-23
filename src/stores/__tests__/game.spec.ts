@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useGameStore } from '@/stores/game'
+import { validateRoster } from '@/data/cast'
 
 describe('game store', () => {
   beforeEach(() => {
@@ -40,6 +41,22 @@ describe('game store', () => {
       store.applyStatDelta({ cash: 99999 })
       store.startGame({ bandName: 'B', genre: 'Pop', originTrait: 'Universitários' })
       expect(store.stats.cash).toBe(500)
+    })
+  })
+
+  describe('roster', () => {
+    it('seeds a valid default roster on startGame', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      expect(store.members).toHaveLength(4)
+      expect(validateRoster(store.members).valid).toBe(true)
+    })
+
+    it('clears the roster on resetGame', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.resetGame()
+      expect(store.members).toEqual([])
     })
   })
 

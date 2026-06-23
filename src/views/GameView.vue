@@ -7,6 +7,13 @@
 
     <StatsPanel />
 
+    <section class="roster" aria-label="Membros da banda">
+      <h2 class="roster__title">Banda</h2>
+      <div class="roster__grid">
+        <MemberCard v-for="m in store.members" :key="m.memberId" :member="m" />
+      </div>
+    </section>
+
     <div class="game-view__actions">
       <button
         v-for="action in actions"
@@ -25,6 +32,7 @@
 <script setup lang="ts">
 import StatsPanel from '@/components/StatsPanel.vue'
 import EventFeed from '@/components/EventFeed.vue'
+import MemberCard from '@/components/MemberCard.vue'
 import { useGameStore } from '@/stores/game'
 
 const store = useGameStore()
@@ -88,6 +96,26 @@ const actions = [
   padding: var(--bq-space-1) var(--bq-space-3);
   border-radius: var(--bq-radius-pill);
   background: var(--bq-spotlight-dim);
+}
+
+.roster {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bq-space-3);
+}
+
+.roster__title {
+  font-size: var(--bq-text-sm);
+  font-weight: var(--bq-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-caps);
+  color: var(--bq-text-muted);
+}
+
+.roster__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bq-space-4);
 }
 
 .game-view__actions {
