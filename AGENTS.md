@@ -19,3 +19,25 @@ This repository implements the Band Quest features documented in `../band-quest-
 ## Development expectation
 
 Each feature should arrive here already refined enough to be implemented in small slices, with the documentation acting as the contract between planning and code.
+
+## Testing and validation
+
+The agent must be able to attest to its own work without relying on the user
+opening files in a browser. Therefore:
+
+- **Code:** every code change ships with unit tests (Vitest). Vue components are
+  tested with `@vue/test-utils` (logic + render). Run `npm run test:unit`,
+  `npm run type-check` and `npm run lint` before considering a slice done.
+- **Art assets (SVG):** every SVG the agent creates must be covered by an
+  automated test that validates, at minimum:
+  - the file parses as **well-formed XML** (catches issues like `--` inside
+    comments, unclosed tags);
+  - the root `<svg>` has a **square `viewBox`** and a `viewBox` attribute;
+  - there is **no embedded raster** (`<image>`) and no opaque full-bleed
+    background rectangle (assets must be transparent);
+  - the filename follows `member-<slug>.svg` and lives in `src/assets/members/`;
+  - **coverage:** every character defined in the feature spec
+    (`band-quest-docs/.../planning/design.md`) has a matching SVG, and every SVG
+    maps back to a character.
+- Do not mark an art handoff or implementation slice complete until its
+  validation test exists and passes.

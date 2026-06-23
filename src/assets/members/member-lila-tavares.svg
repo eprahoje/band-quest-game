@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Lila Tavares — Vocal">
+  <!-- Band Quest · member sample · Lila Tavares (Vocal) · accent token bq-stat-fans #ff5c8a -->
+  <!-- cabelo black power -->
+  <circle cx="48" cy="39" r="29" fill="#1b1b20"/>
+  <!-- ombros / roupa (acento) -->
+  <path d="M12 96C12 77 29 69 48 69s36 8 36 27Z" fill="#ff5c8a"/>
+  <!-- pescoco -->
+  <rect x="42" y="54" width="12" height="18" fill="#6f4a3a"/>
+  <!-- rosto -->
+  <ellipse cx="48" cy="46" rx="16.5" ry="19.5" fill="#7c5746"/>
+  <!-- sobrancelhas -->
+  <path d="M37 40q4-2.5 8 0" fill="none" stroke="#1b1b20" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M51 40q4-2.5 8 0" fill="none" stroke="#1b1b20" stroke-width="1.6" stroke-linecap="round"/>
+  <!-- olhos -->
+  <circle cx="41" cy="46" r="2.4" fill="#17120c"/>
+  <circle cx="55" cy="46" r="2.4" fill="#17120c"/>
+  <!-- sorriso largo -->
+  <path d="M39 54q9 9 18 0q-9 5-18 0Z" fill="#3a1f1f"/>
+  <path d="M42.5 55.5q5.5 3.5 11 0q-5.5 2.5-11 0Z" fill="#ffffff"/>
+  <!-- brinco (pop dourado) -->
+  <circle cx="31.5" cy="54" r="2.1" fill="#f5a623"/>
+</svg>
