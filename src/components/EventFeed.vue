@@ -7,9 +7,14 @@
     </p>
 
     <ol v-else class="event-feed__list">
-      <li v-for="event in store.recentEvents" :key="event.id" class="event-item">
-        <span class="event-item__icon" :class="`event-item__icon--${event.category}`">
-          <component :is="categoryMeta[event.category].icon" :size="18" stroke-width="1.5" />
+      <li
+        v-for="event in store.recentEvents"
+        :key="event.id"
+        class="event-item"
+        :style="{ '--accent': categoryMeta[event.category].accent }"
+      >
+        <span class="event-item__icon">
+          <component :is="categoryMeta[event.category].icon" :size="18" stroke-width="2" />
         </span>
         <div class="event-item__body">
           <p class="event-item__message">{{ event.message }}</p>
@@ -37,13 +42,13 @@ import type { EventCategory } from '@/stores/game'
 
 const store = useGameStore()
 
-const categoryMeta: Record<EventCategory, { icon: Component; label: string }> = {
-  show: { icon: IconMicrophone2, label: 'Show' },
-  recording: { icon: IconDeviceSpeaker, label: 'Gravação' },
-  tour: { icon: IconBus, label: 'Turnê' },
-  negotiation: { icon: IconBriefcase, label: 'Negociação' },
-  milestone: { icon: IconTrophy, label: 'Marco' },
-  setback: { icon: IconAlertTriangle, label: 'Revés' },
+const categoryMeta: Record<EventCategory, { icon: Component; label: string; accent: string }> = {
+  show: { icon: IconMicrophone2, label: 'Show', accent: 'var(--bq-stat-fans)' },
+  recording: { icon: IconDeviceSpeaker, label: 'Gravação', accent: 'var(--bq-spotlight)' },
+  tour: { icon: IconBus, label: 'Turnê', accent: 'var(--bq-info)' },
+  negotiation: { icon: IconBriefcase, label: 'Negociação', accent: 'var(--bq-stat-cash)' },
+  milestone: { icon: IconTrophy, label: 'Marco', accent: 'var(--bq-spotlight)' },
+  setback: { icon: IconAlertTriangle, label: 'Revés', accent: 'var(--bq-negative)' },
 }
 </script>
 
@@ -51,78 +56,84 @@ const categoryMeta: Record<EventCategory, { icon: Component; label: string }> = 
 .event-feed {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--bq-space-4);
 }
 
 .event-feed__title {
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: var(--bq-text-sm);
+  font-weight: var(--bq-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.6;
+  letter-spacing: var(--bq-tracking-caps);
+  color: var(--bq-text-muted);
 }
 
 .event-feed__empty {
-  font-size: 0.9rem;
-  opacity: 0.5;
-  padding: 16px 0;
+  font-size: var(--bq-text-sm);
+  color: var(--bq-text-faint);
+  padding: var(--bq-space-4) 0;
 }
 
 .event-feed__list {
+  position: relative;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding-left: var(--bq-space-6);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--bq-space-4);
+}
+
+.event-feed__list::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--bq-border);
 }
 
 .event-item {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  background: var(--color-surface, #1e1e2e);
-  border: 1px solid var(--color-border, #313244);
-  border-radius: 8px;
+  gap: var(--bq-space-3);
 }
 
 .event-item__icon {
+  position: absolute;
+  left: calc(-1 * var(--bq-space-6) + 4px);
+  top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background: var(--color-border, #313244);
-  color: var(--color-text, #cdd6f4);
-}
-
-.event-item__icon--milestone {
-  color: #f9e2af;
-}
-
-.event-item__icon--setback {
-  color: #f38ba8;
+  border-radius: var(--bq-radius-pill);
+  background: var(--bq-bg-elevated);
+  border: 1px solid var(--bq-border-strong);
+  color: var(--accent);
 }
 
 .event-item__body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-left: var(--bq-space-4);
 }
 
 .event-item__message {
-  font-size: 0.9rem;
-  line-height: 1.3;
-  color: var(--color-text, #cdd6f4);
+  font-size: var(--bq-text-sm);
+  line-height: var(--bq-leading-snug);
+  color: var(--bq-text);
 }
 
 .event-item__meta {
-  font-size: 0.7rem;
-  opacity: 0.5;
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-faint);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--bq-tracking-caps);
+  font-family: var(--bq-font-mono);
 }
 </style>

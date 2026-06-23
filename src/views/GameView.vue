@@ -1,7 +1,7 @@
 <template>
   <main class="game-view">
     <header class="game-view__header">
-      <h1>{{ store.bandName }}</h1>
+      <h1 class="game-view__band">{{ store.bandName }}</h1>
       <span class="turn-badge">Turno {{ store.turn }}</span>
     </header>
 
@@ -61,8 +61,8 @@ const actions = [
 .game-view {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 24px;
+  gap: var(--bq-space-5);
+  padding: var(--bq-space-6);
   max-width: 960px;
   margin: 0 auto;
 }
@@ -70,38 +70,48 @@ const actions = [
 .game-view__header {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: var(--bq-space-4);
 }
 
-.game-view__header h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
+.game-view__band {
+  font-size: var(--bq-text-2xl);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-display);
 }
 
 .turn-badge {
-  font-size: 0.8rem;
-  opacity: 0.5;
+  font-size: var(--bq-text-xs);
+  font-family: var(--bq-font-mono);
+  color: var(--bq-spotlight);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-caps);
+  padding: var(--bq-space-1) var(--bq-space-3);
+  border-radius: var(--bq-radius-pill);
+  background: var(--bq-spotlight-dim);
 }
 
 .game-view__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--bq-space-2);
 }
 
 .action-btn {
-  padding: 10px 18px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  background: var(--color-surface, #1e1e2e);
-  color: var(--color-text, #cdd6f4);
-  border: 1px solid var(--color-border, #313244);
-  border-radius: 6px;
+  padding: var(--bq-space-3) var(--bq-space-5);
+  font-size: var(--bq-text-sm);
+  font-weight: var(--bq-weight-semibold);
+  color: var(--bq-text);
+  background: var(--bq-bg-surface);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-md);
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition:
+    border-color var(--bq-dur-base) var(--bq-ease),
+    color var(--bq-dur-base) var(--bq-ease);
 }
 
 .action-btn:hover {
-  border-color: var(--color-accent, #cba6f7);
+  border-color: var(--bq-spotlight);
+  color: var(--bq-spotlight);
 }
 </style>

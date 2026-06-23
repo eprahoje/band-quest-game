@@ -1,6 +1,6 @@
 <template>
   <main class="start-view">
-    <h1 class="start-view__title">Band Quest</h1>
+    <h1 class="start-view__title">Band <span>Quest</span></h1>
     <p class="start-view__subtitle">RPG de gestão de banda de rock</p>
     <button class="start-view__btn" @click="handleStart">Nova Partida</button>
   </main>
@@ -26,31 +26,43 @@ function handleStart() {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  gap: 16px;
+  gap: var(--bq-space-4);
+  padding: var(--bq-space-6);
+  text-align: center;
 }
 
 .start-view__title {
-  font-size: 3rem;
-  font-weight: 900;
+  font-size: var(--bq-text-3xl);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-display);
+}
+
+.start-view__title span {
+  color: var(--bq-spotlight);
 }
 
 .start-view__subtitle {
-  opacity: 0.6;
+  color: var(--bq-text-muted);
+  font-size: var(--bq-text-lg);
 }
 
 .start-view__btn {
-  margin-top: 24px;
-  padding: 12px 32px;
-  font-size: 1rem;
-  font-weight: 600;
-  background: var(--color-accent, #cba6f7);
-  color: #1e1e2e;
+  margin-top: var(--bq-space-5);
+  padding: var(--bq-space-3) var(--bq-space-7);
+  font-family: var(--bq-font-display);
+  font-size: var(--bq-text-md);
+  font-weight: var(--bq-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-caps);
+  color: var(--bq-text-on-accent);
+  background: var(--bq-spotlight);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--bq-radius-md);
   cursor: pointer;
+  transition: box-shadow var(--bq-dur-base) var(--bq-ease);
 }
 
 .start-view__btn:hover {
-  opacity: 0.85;
+  box-shadow: var(--bq-glow-spotlight);
 }
 </style>
