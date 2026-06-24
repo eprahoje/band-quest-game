@@ -69,6 +69,21 @@ export const MONTH_NAMES = [
   'Dezembro',
 ] as const
 
+// Balance pass 1 (0003 iteration-05) — placeholders a afinar jogando.
+export const MEMBER_BASE_MONTHLY_COST = 100 // R$ por membro/mês (× fator de reputação)
+const REP_GRACE_DAYS = 30 // dias de inatividade pública antes de a reputação cair
+const REP_DECAY_EVERY = 10 // após a carência, perde 1 de reputação a cada N dias inativos
+
+// Ações voltadas ao público — zeram a inatividade (evitam decay de reputação).
+const PUBLIC_ACTION_IDS = new Set([
+  'play-show',
+  'tour',
+  'record-demo',
+  'record-single',
+  'record-album',
+  'marketing',
+])
+
 export interface StartActionResult {
   ok: boolean
   reason?: string
@@ -86,6 +101,8 @@ export const useGameStore = defineStore('game', () => {
   const events = ref<GameEvent[]>([])
   const songs = ref(0)
   const activeActions = ref<ActiveAction[]>([])
+  // Dias desde a última atividade pública (para o decay de reputação).
+  const inactiveDays = ref(0)
 
   let eventSeq = 0
   // Fonte de aleatoriedade injetável (determinismo em testes).
@@ -135,6 +152,11 @@ export const useGameStore = defineStore('game', () => {
   // Modulador aplicado aos ganhos positivos das ações (~1.0–1.2).
   const qualityModifier = computed(() => 0.8 + bandQuality.value * 0.4)
 
+  // Custo mensal total da banda: por membro, crescendo com a reputação (0003 it-05).
+  const monthlyMemberCost = computed(() =>
+    Math.round(members.value.length * MEMBER_BASE_MONTHLY_COST * (1 + stats.value.reputation / 100)),
+  )
+
   function startGame(payload: { bandName: string; genre: string; originTrait: string }) {
     bandName.value = payload.bandName
     genre.value = payload.genre
@@ -144,6 +166,7 @@ export const useGameStore = defineStore('game', () => {
     events.value = []
     songs.value = 0
     activeActions.value = []
+    inactiveDays.value = 0
     eventSeq = 0
     turn.value = 1
     currentView.value = 'game'
@@ -246,10 +269,40 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  // Avança `days` dias: decrementa as ações ativas e conclui as que chegam a zero.
+  // Cobra os custos mensais (membros) por cada virada de mês cruzada no avanço.
+  function chargeMonthlyCosts(oldTurn: number, newTurn: number) {
+    const monthsCrossed =
+      Math.floor((newTurn - 1) / DAYS_PER_MONTH) - Math.floor((oldTurn - 1) / DAYS_PER_MONTH)
+    for (let i = 0; i < monthsCrossed; i++) {
+      const cost = monthlyMemberCost.value
+      if (cost > 0) {
+        applyStatDelta({ cash: -cost })
+        logEvent('negotiation', `Custos mensais da banda: -R$ ${cost}.`)
+      }
+    }
+  }
+
+  // Decay de reputação por inatividade pública: após REP_GRACE_DAYS, perde 1 ponto
+  // a cada REP_DECAY_EVERY dias inativos (0003 it-05).
+  function applyReputationDecay(days: number) {
+    const before = inactiveDays.value
+    const after = before + days
+    inactiveDays.value = after
+    const unitsBefore = Math.max(0, Math.floor((before - REP_GRACE_DAYS) / REP_DECAY_EVERY))
+    const unitsAfter = Math.max(0, Math.floor((after - REP_GRACE_DAYS) / REP_DECAY_EVERY))
+    const decay = unitsAfter - unitsBefore
+    if (decay > 0) applyStatDelta({ reputation: -decay })
+  }
+
+  // Avança `days` dias: cobra custos mensais, aplica decay, e conclui ações prontas.
   function advanceDays(days: number) {
     if (days <= 0) return
+    const oldTurn = turn.value
     turn.value += days
+
+    chargeMonthlyCosts(oldTurn, turn.value)
+    applyReputationDecay(days)
+
     const remaining: ActiveAction[] = []
     const completed: ActiveAction[] = []
     for (const a of activeActions.value) {
@@ -258,7 +311,11 @@ export const useGameStore = defineStore('game', () => {
       else remaining.push(a)
     }
     activeActions.value = remaining
-    for (const a of completed) completeAction(a)
+    for (const a of completed) {
+      completeAction(a)
+      // atividade pública zera a inatividade (reputação volta a "contar")
+      if (PUBLIC_ACTION_IDS.has(a.actionId)) inactiveDays.value = 0
+    }
   }
 
   // Salta o relógio até a próxima conclusão de ação (1 dia se nada estiver ativo).
@@ -275,6 +332,7 @@ export const useGameStore = defineStore('game', () => {
     events.value = []
     songs.value = 0
     activeActions.value = []
+    inactiveDays.value = 0
     eventSeq = 0
     turn.value = 0
     currentView.value = 'start'
@@ -305,6 +363,8 @@ export const useGameStore = defineStore('game', () => {
     nextCompletionDays,
     bandQuality,
     qualityModifier,
+    monthlyMemberCost,
+    inactiveDays,
     startGame,
     applyStatDelta,
     logEvent,

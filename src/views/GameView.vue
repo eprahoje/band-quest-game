@@ -14,6 +14,24 @@
       <button class="advance-btn" type="button" @click="advance">{{ advanceLabel }}</button>
     </section>
 
+    <section class="costs" aria-label="Custos da banda">
+      <h2 class="section-title">Custos</h2>
+      <ul class="costs__list">
+        <li class="costs__item">
+          <span>Membros (mensal)</span>
+          <strong>R$ {{ store.monthlyMemberCost }}/mês</strong>
+        </li>
+        <li class="costs__item costs__item--muted">
+          <span>Por ação (estúdio, gravação, marketing)</span>
+          <span>ver cartões abaixo</span>
+        </li>
+        <li class="costs__item costs__item--muted">
+          <span>Staff / estrutura</span>
+          <span>em breve</span>
+        </li>
+      </ul>
+    </section>
+
     <section class="roster" aria-label="Membros da banda">
       <h2 class="section-title">Banda</h2>
       <div class="roster__grid">
@@ -51,6 +69,10 @@
             <span v-if="group.action.lane === 'background'" class="action-card__tag">paralela</span>
           </header>
           <p class="action-card__desc">{{ group.action.description }}</p>
+          <p v-if="group.cost || group.reqs.length" class="action-card__meta">
+            <span v-if="group.cost">Custo base: R$ {{ group.cost }}</span>
+            <span v-if="group.reqs.length">Requer: {{ group.reqs.join(' · ') }}</span>
+          </p>
           <p v-if="group.disabled && group.reason" class="action-card__reason">{{ group.reason }}</p>
           <div class="action-card__efforts">
             <button
@@ -85,7 +107,12 @@ const store = useGameStore()
 const actionGroups = computed(() =>
   ACTIONS.map((action) => {
     const check = store.canStartAction(action.id)
-    return { action, disabled: !check.ok, reason: check.reason }
+    const baseCash = action.outcome.metrics.cash ?? 0
+    const cost = baseCash < 0 ? -baseCash : 0
+    const reqs: string[] = []
+    if (action.requires?.songs) reqs.push(`${action.requires.songs} música(s)`)
+    if (action.requires?.reputation) reqs.push(`${action.requires.reputation} de reputação`)
+    return { action, disabled: !check.ok, reason: check.reason, cost, reqs }
   }),
 )
 
@@ -176,6 +203,39 @@ function advance() {
   letter-spacing: var(--bq-tracking-caps);
   color: var(--bq-text-muted);
   margin-bottom: var(--bq-space-3);
+}
+
+.costs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bq-space-1);
+}
+
+.costs__item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--bq-space-4);
+  padding: var(--bq-space-2) var(--bq-space-3);
+  font-size: var(--bq-text-sm);
+  background: var(--bq-bg-surface);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-sm);
+}
+
+.costs__item--muted {
+  color: var(--bq-text-faint);
+  font-size: var(--bq-text-xs);
+}
+
+.action-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-faint);
 }
 
 .roster__grid {

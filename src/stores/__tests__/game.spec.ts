@@ -264,6 +264,51 @@ describe('game store', () => {
     })
   })
 
+  describe('economy: monthly costs & reputation decay (0003 it-05)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('monthly member cost grows with reputation', () => {
+      const store = freshGame()
+      expect(store.monthlyMemberCost).toBe(440) // 4 membros × 100 × (1 + 10/100)
+      store.applyStatDelta({ reputation: 40 }) // 10 -> 50
+      expect(store.monthlyMemberCost).toBe(600) // 4 × 100 × 1.5
+    })
+
+    it('charges the monthly cost when a month boundary is crossed', () => {
+      const store = freshGame()
+      store.advanceDays(30) // turn 1 -> 31 (cruza 1 mês)
+      expect(store.stats.cash).toBe(500 - 440)
+      expect(store.recentEvents[0]?.category).toBe('negotiation')
+    })
+
+    it('does not charge before completing a full month', () => {
+      const store = freshGame()
+      store.advanceDays(29)
+      expect(store.stats.cash).toBe(500)
+    })
+
+    it('decays reputation after the inactivity grace period', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 40 }) // 10 -> 50, para enxergar o decay
+      store.advanceDays(40) // 30 de carência + 10 inativos => -1 de reputação
+      expect(store.stats.reputation).toBe(49)
+    })
+
+    it('public activity resets the inactivity counter', () => {
+      const store = freshGame()
+      store.advanceDays(35) // acumula inatividade (ainda sem decay: 5 além da carência)
+      expect(store.inactiveDays).toBe(35)
+      store.startAction('play-show')
+      store.advanceToNextCompletion() // show é atividade pública
+      expect(store.inactiveDays).toBe(0)
+    })
+  })
+
   describe('events', () => {
     it('starts with no events before a game begins', () => {
       const store = useGameStore()

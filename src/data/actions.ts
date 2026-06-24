@@ -19,6 +19,9 @@ export interface ActionEffortOption {
   label: string
   durationTurns: number // dias (turno = dia)
   costModifier: number // multiplica o custo (cash negativo)
+  // Escala os ganhos positivos (fãs/reputação/cachê). Mais esforço = mais qualidade,
+  // tornando "caprichado" um trade-off real (0003 it-05). Default 1.
+  outcomeModifier: number
 }
 
 export interface ActionRequirements {
@@ -60,10 +63,10 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'practice',
     description: 'A banda ensaia e ganha entrosamento.',
     effortOptions: [
-      { label: 'Ensaio leve', durationTurns: 2, costModifier: 1 },
-      { label: 'Ensaio pesado', durationTurns: 4, costModifier: 1 },
+      { label: 'Ensaio leve', durationTurns: 2, costModifier: 1, outcomeModifier: 1 },
+      { label: 'Ensaio pesado', durationTurns: 4, costModifier: 1, outcomeModifier: 1.6 },
     ],
-    outcome: { metrics: { reputation: 1, fatigue: 8 }, variance: 0.1 },
+    outcome: { metrics: { reputation: 1, fatigue: 10 }, variance: 0.1 },
   },
   {
     id: 'compose',
@@ -71,9 +74,9 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'recording',
     description: 'Compõe uma nova música (insumo para gravar).',
-    effortOptions: [{ label: 'Compor', durationTurns: 5, costModifier: 1 }],
+    effortOptions: [{ label: 'Compor', durationTurns: 5, costModifier: 1, outcomeModifier: 1 }],
     produces: { songs: 1 },
-    outcome: { metrics: { fatigue: 6 }, variance: 0.15 },
+    outcome: { metrics: { fatigue: 8 }, variance: 0.15 },
   },
   {
     id: 'record-demo',
@@ -81,9 +84,9 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'recording',
     description: 'Grava uma demo caseira a partir de uma música.',
-    effortOptions: [{ label: 'Demo caseira', durationTurns: 3, costModifier: 1 }],
+    effortOptions: [{ label: 'Demo caseira', durationTurns: 3, costModifier: 1, outcomeModifier: 1 }],
     requires: { songs: 1 },
-    outcome: { metrics: { cash: -100, reputation: 2, fans: 20 }, variance: 0.2 },
+    outcome: { metrics: { cash: -150, reputation: 1, fans: 25 }, variance: 0.2 },
   },
   {
     id: 'record-single',
@@ -92,11 +95,11 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'recording',
     description: 'Grava e lança um single.',
     effortOptions: [
-      { label: 'Single', durationTurns: 10, costModifier: 1 },
-      { label: 'Single caprichado', durationTurns: 16, costModifier: 1.6 },
+      { label: 'Single', durationTurns: 10, costModifier: 1, outcomeModifier: 1 },
+      { label: 'Single caprichado', durationTurns: 16, costModifier: 1.6, outcomeModifier: 1.7 },
     ],
     requires: { songs: 1 },
-    outcome: { metrics: { cash: -300, reputation: 4, fans: 120 }, variance: 0.2 },
+    outcome: { metrics: { cash: -400, reputation: 2, fans: 120 }, variance: 0.2 },
   },
   {
     id: 'record-album',
@@ -105,11 +108,11 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'recording',
     description: 'Grava um álbum completo a partir de várias músicas.',
     effortOptions: [
-      { label: 'Álbum', durationTurns: 35, costModifier: 1 },
-      { label: 'Álbum caprichado', durationTurns: 50, costModifier: 1.7 },
+      { label: 'Álbum', durationTurns: 35, costModifier: 1, outcomeModifier: 1 },
+      { label: 'Álbum caprichado', durationTurns: 50, costModifier: 1.7, outcomeModifier: 1.8 },
     ],
     requires: { songs: 3 },
-    outcome: { metrics: { cash: -1200, reputation: 12, fans: 600 }, variance: 0.25 },
+    outcome: { metrics: { cash: -1500, reputation: 6, fans: 600 }, variance: 0.25 },
   },
   {
     id: 'play-show',
@@ -117,8 +120,8 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'show',
     description: 'Toca um show e ganha cachê, fãs e reputação.',
-    effortOptions: [{ label: 'Show local', durationTurns: 1, costModifier: 1 }],
-    outcome: { metrics: { cash: 200, reputation: 3, fans: 40, fatigue: 15 }, variance: 0.2 },
+    effortOptions: [{ label: 'Show local', durationTurns: 1, costModifier: 1, outcomeModifier: 1 }],
+    outcome: { metrics: { cash: 150, reputation: 1, fans: 30, fatigue: 18 }, variance: 0.2 },
   },
   {
     id: 'tour',
@@ -127,11 +130,11 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'tour',
     description: 'Sai em turnê: muito retorno, muito desgaste.',
     effortOptions: [
-      { label: 'Mini-turnê', durationTurns: 14, costModifier: 1 },
-      { label: 'Turnê nacional', durationTurns: 45, costModifier: 1.5 },
+      { label: 'Mini-turnê', durationTurns: 14, costModifier: 1, outcomeModifier: 1 },
+      { label: 'Turnê nacional', durationTurns: 45, costModifier: 1.5, outcomeModifier: 1.6 },
     ],
     requires: { reputation: 30 },
-    outcome: { metrics: { cash: 1500, reputation: 8, fans: 500, fatigue: 45 }, variance: 0.25 },
+    outcome: { metrics: { cash: 1800, reputation: 5, fans: 500, fatigue: 45 }, variance: 0.25 },
   },
   {
     id: 'marketing',
@@ -139,8 +142,8 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'background',
     category: 'marketing',
     description: 'Campanha de divulgação que roda em paralelo.',
-    effortOptions: [{ label: 'Campanha', durationTurns: 14, costModifier: 1 }],
-    outcome: { metrics: { cash: -200, fans: 80 }, variance: 0.2 },
+    effortOptions: [{ label: 'Campanha', durationTurns: 14, costModifier: 1, outcomeModifier: 1 }],
+    outcome: { metrics: { cash: -300, fans: 90 }, variance: 0.2 },
   },
   {
     id: 'rest',
@@ -148,7 +151,7 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'rest',
     description: 'A banda descansa e recupera energia.',
-    effortOptions: [{ label: 'Descanso', durationTurns: 5, costModifier: 1 }],
+    effortOptions: [{ label: 'Descanso', durationTurns: 5, costModifier: 1, outcomeModifier: 1 }],
     outcome: { metrics: { fatigue: -30 }, variance: 0 },
     allowWhenFatigued: true,
   },
@@ -187,7 +190,8 @@ export function resolveOutcome(
     if (base === undefined) continue
     let v = base
     if (key === 'cash' && base < 0) v *= effort.costModifier
-    if (base > 0 && key !== 'fatigue') v *= quality
+    // ganhos positivos (não fadiga) escalam com a qualidade da banda E o esforço
+    if (base > 0 && key !== 'fatigue') v *= quality * effort.outcomeModifier
     v *= factor
     result[key] = Math.round(v)
   }

@@ -54,7 +54,7 @@ describe('resolveOutcome', () => {
     const action = getAction('play-show')
     const effort = resolveEffort(action)
     const out = resolveOutcome(action, effort, { rng: noVariance, qualityModifier: 1 })
-    expect(out).toEqual({ cash: 200, reputation: 3, fans: 40, fatigue: 15 })
+    expect(out).toEqual({ cash: 150, reputation: 1, fans: 30, fatigue: 18 })
   })
 
   it('scales positive non-fatigue gains by the quality modifier', () => {
@@ -63,22 +63,23 @@ describe('resolveOutcome', () => {
       rng: noVariance,
       qualityModifier: 1.2,
     })
-    expect(out.fans).toBe(48) // 40 * 1.2
-    expect(out.fatigue).toBe(15) // fadiga não escala com qualidade
+    expect(out.fans).toBe(36) // 30 * 1.2
+    expect(out.fatigue).toBe(18) // fadiga não escala com qualidade
   })
 
-  it('scales negative cash cost by the effort cost modifier', () => {
+  it('scales positive gains by the effort outcome modifier (caprichado)', () => {
     const action = getAction('record-single')
     const careful = action.effortOptions.find((e) => e.label === 'Single caprichado')!
     const out = resolveOutcome(action, careful, { rng: noVariance, qualityModifier: 1 })
-    expect(out.cash).toBe(-480) // -300 * 1.6
+    expect(out.fans).toBe(204) // 120 * 1.7
+    expect(out.cash).toBe(-640) // -400 * 1.6 (custo escala pelo costModifier)
   })
 
   it('applies variance within the declared bounds', () => {
     const action = getAction('play-show') // variance 0.2
     const low = resolveOutcome(action, resolveEffort(action), { rng: () => 0, qualityModifier: 1 })
     const high = resolveOutcome(action, resolveEffort(action), { rng: () => 1, qualityModifier: 1 })
-    expect(low.fans).toBe(32) // 40 * (1 - 0.2)
-    expect(high.fans).toBe(48) // 40 * (1 + 0.2)
+    expect(low.fans).toBe(24) // 30 * (1 - 0.2)
+    expect(high.fans).toBe(36) // 30 * (1 + 0.2)
   })
 })

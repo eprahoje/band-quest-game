@@ -34,6 +34,12 @@ describe('GameView', () => {
     expect(wrapper.findAll('.effort-btn').length).toBeGreaterThan(0)
   })
 
+  it('shows the costs panel with the monthly member cost', () => {
+    const wrapper = render()
+    expect(wrapper.text()).toContain('Custos')
+    expect(wrapper.text()).toContain('R$ 440/mês') // 4 membros × 100 × 1.1
+  })
+
   it('starts an action when an effort button is clicked', async () => {
     const wrapper = render()
     const store = useGameStore()
