@@ -49,8 +49,25 @@ const INITIAL_STATS: BandStats = {
   fatigue: 0,
 }
 
-// Turno = semana (feature 0003).
-export const WEEKS_PER_YEAR = 52
+// Turno = dia (0008 it-02 / 0003 it-04). Calendário regular: 12 meses × 30 dias.
+export const DAYS_PER_MONTH = 30
+export const MONTHS_PER_YEAR = 12
+export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR // 360
+
+export const MONTH_NAMES = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+] as const
 
 export interface StartActionResult {
   ok: boolean
@@ -80,12 +97,17 @@ export const useGameStore = defineStore('game', () => {
   // Eventos mais recentes primeiro, para renderização direta na timeline.
   const recentEvents = computed(() => [...events.value].reverse())
 
-  // Calendário derivado do turno (semana). Antes de começar: ano 1, semana 0.
+  // Calendário derivado do turno (dia). Antes de começar: ano 1, dia 0.
   const calendar = computed(() => {
-    if (turn.value < 1) return { year: 1, week: 0 }
+    if (turn.value < 1) return { year: 1, month: 1, monthName: MONTH_NAMES[0], day: 0 }
+    const zero = turn.value - 1
+    const dayOfYear = zero % DAYS_PER_YEAR
+    const month = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1
     return {
-      year: Math.floor((turn.value - 1) / WEEKS_PER_YEAR) + 1,
-      week: ((turn.value - 1) % WEEKS_PER_YEAR) + 1,
+      year: Math.floor(zero / DAYS_PER_YEAR) + 1,
+      month,
+      monthName: MONTH_NAMES[month - 1] ?? MONTH_NAMES[0],
+      day: (dayOfYear % DAYS_PER_MONTH) + 1,
     }
   })
 
@@ -93,6 +115,12 @@ export const useGameStore = defineStore('game', () => {
     () => activeActions.value.find((a) => a.lane === 'main') ?? null,
   )
   const canStartMain = computed(() => !activeMainAction.value && !isFatigued.value)
+
+  // Dias até a próxima conclusão de ação (1 se não houver ações ativas).
+  const nextCompletionDays = computed(() => {
+    if (activeActions.value.length === 0) return 1
+    return Math.min(...activeActions.value.map((a) => a.turnsRemaining))
+  })
 
   // Qualidade da banda (0..1) = média dos atributos dos membros / 100.
   const bandQuality = computed(() => {
@@ -218,17 +246,24 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function advanceTurn() {
-    turn.value++
+  // Avança `days` dias: decrementa as ações ativas e conclui as que chegam a zero.
+  function advanceDays(days: number) {
+    if (days <= 0) return
+    turn.value += days
     const remaining: ActiveAction[] = []
     const completed: ActiveAction[] = []
     for (const a of activeActions.value) {
-      a.turnsRemaining -= 1
+      a.turnsRemaining -= days
       if (a.turnsRemaining <= 0) completed.push(a)
       else remaining.push(a)
     }
     activeActions.value = remaining
     for (const a of completed) completeAction(a)
+  }
+
+  // Salta o relógio até a próxima conclusão de ação (1 dia se nada estiver ativo).
+  function advanceToNextCompletion() {
+    advanceDays(nextCompletionDays.value)
   }
 
   function resetGame() {
@@ -267,6 +302,7 @@ export const useGameStore = defineStore('game', () => {
     calendar,
     activeMainAction,
     canStartMain,
+    nextCompletionDays,
     bandQuality,
     qualityModifier,
     startGame,
@@ -274,7 +310,8 @@ export const useGameStore = defineStore('game', () => {
     logEvent,
     canStartAction,
     startAction,
-    advanceTurn,
+    advanceDays,
+    advanceToNextCompletion,
     resetGame,
     setRandomSource,
   }

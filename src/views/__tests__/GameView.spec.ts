@@ -19,11 +19,12 @@ describe('GameView', () => {
     return mount(GameView, { global: { plugins: [pinia] } })
   }
 
-  it('renders the band name and the weekly calendar badge', () => {
+  it('renders the band name and the daily calendar badge', () => {
     const wrapper = render()
     expect(wrapper.text()).toContain('The Fuzz')
     expect(wrapper.text()).toContain('Ano 1')
-    expect(wrapper.text()).toContain('Semana 1')
+    expect(wrapper.text()).toContain('Janeiro')
+    expect(wrapper.text()).toContain('dia 1')
   })
 
   it('renders an action card with effort buttons for each catalog action', () => {
@@ -43,15 +44,15 @@ describe('GameView', () => {
     expect(store.activeActions[0]?.actionId).toBe('play-show')
   })
 
-  it('advances the week and completes a queued action', async () => {
+  it('advances time and completes a queued action', async () => {
     const wrapper = render()
     const store = useGameStore()
     const showBtn = wrapper.findAll('.effort-btn').find((b) => b.text().includes('Show local'))
     await showBtn!.trigger('click')
-    const advanceBtn = wrapper.findAll('button').find((b) => b.text().includes('Avançar semana'))
+    const advanceBtn = wrapper.findAll('button').find((b) => b.text().includes('Avançar'))
     expect(advanceBtn).toBeTruthy()
     await advanceBtn!.trigger('click')
-    expect(store.turn).toBe(2)
+    expect(store.turn).toBe(2) // play-show dura 1 dia
     expect(store.activeActions).toHaveLength(0)
   })
 })

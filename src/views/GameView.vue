@@ -2,14 +2,16 @@
   <main class="game-view">
     <header class="game-view__header">
       <h1 class="game-view__band">{{ store.bandName }}</h1>
-      <span class="turn-badge">Ano {{ store.calendar.year }} · Semana {{ store.calendar.week }}</span>
+      <span class="turn-badge">
+        Ano {{ store.calendar.year }} · {{ store.calendar.monthName }}, dia {{ store.calendar.day }}
+      </span>
     </header>
 
     <StatsPanel />
 
     <section class="loop-bar" aria-label="Calendário">
       <span class="loop-bar__songs">Músicas prontas: <strong>{{ store.songs }}</strong></span>
-      <button class="advance-btn" type="button" @click="advance">Avançar semana ›</button>
+      <button class="advance-btn" type="button" @click="advance">{{ advanceLabel }}</button>
     </section>
 
     <section class="roster" aria-label="Membros da banda">
@@ -22,14 +24,14 @@
     <section class="in-progress" aria-label="Ações em andamento">
       <h2 class="section-title">Em andamento</h2>
       <p v-if="store.activeActions.length === 0" class="in-progress__empty">
-        Nada em andamento. Escolha uma ação e avance as semanas.
+        Nada em andamento. Escolha uma ação para o tempo avançar.
       </p>
       <ul v-else class="in-progress__list">
         <li v-for="a in store.activeActions" :key="a.actionId" class="progress-item">
           <span class="progress-item__name">{{ a.name }}</span>
           <span class="progress-item__effort">{{ a.effortLabel }}</span>
           <span class="progress-item__remaining">
-            {{ a.turnsRemaining }}/{{ a.totalTurns }} sem
+            {{ a.turnsRemaining }}/{{ a.totalTurns }} dias
           </span>
         </li>
       </ul>
@@ -59,7 +61,7 @@
               :disabled="group.disabled"
               @click="start(group.action, effort)"
             >
-              {{ effort.label }} · {{ effort.durationTurns }} sem
+              {{ effort.label }} · {{ effort.durationTurns }} dias
             </button>
           </div>
         </article>
@@ -87,12 +89,18 @@ const actionGroups = computed(() =>
   }),
 )
 
+const advanceLabel = computed(() => {
+  const days = store.nextCompletionDays
+  if (store.activeActions.length === 0) return 'Avançar 1 dia ›'
+  return `Avançar ${days} ${days === 1 ? 'dia' : 'dias'} ›`
+})
+
 function start(action: ActionDef, effort: ActionEffortOption) {
   store.startAction(action.id, effort.label)
 }
 
 function advance() {
-  store.advanceTurn()
+  store.advanceToNextCompletion()
 }
 </script>
 

@@ -1,9 +1,10 @@
 // Band Quest — modelo de ação e catálogo do core loop (feature 0014).
 // Espelho de band-quest-docs/docs/features/core-loop-and-actions/planning/design.md
 //
-// Turno = semana (0003/0008). Ações têm duração variável em turnos e um ciclo de
-// vida (idle → in-progress → completed). Os NÚMEROS abaixo são placeholders de
-// balance (feature 0003) — serão calibrados numa iteração dedicada.
+// Turno = dia (0008 it-02 / 0003 it-04; calendário 12×30 = 360 dias/ano). Ações têm
+// duração variável em dias e um ciclo de vida (idle → in-progress → completed). O
+// tempo avança pelas ações (ver store). Os NÚMEROS abaixo são placeholders de balance
+// (feature 0003) — serão calibrados numa iteração dedicada.
 
 export type ActionLane = 'main' | 'background'
 
@@ -16,7 +17,7 @@ export type ActionStat = (typeof ACTION_STATS)[number]
 
 export interface ActionEffortOption {
   label: string
-  durationTurns: number // semanas
+  durationTurns: number // dias (turno = dia)
   costModifier: number // multiplica o custo (cash negativo)
 }
 
@@ -59,8 +60,8 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'practice',
     description: 'A banda ensaia e ganha entrosamento.',
     effortOptions: [
-      { label: 'Ensaio leve', durationTurns: 1, costModifier: 1 },
-      { label: 'Ensaio pesado', durationTurns: 2, costModifier: 1 },
+      { label: 'Ensaio leve', durationTurns: 2, costModifier: 1 },
+      { label: 'Ensaio pesado', durationTurns: 4, costModifier: 1 },
     ],
     outcome: { metrics: { reputation: 1, fatigue: 8 }, variance: 0.1 },
   },
@@ -70,7 +71,7 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'recording',
     description: 'Compõe uma nova música (insumo para gravar).',
-    effortOptions: [{ label: 'Compor', durationTurns: 2, costModifier: 1 }],
+    effortOptions: [{ label: 'Compor', durationTurns: 5, costModifier: 1 }],
     produces: { songs: 1 },
     outcome: { metrics: { fatigue: 6 }, variance: 0.15 },
   },
@@ -80,7 +81,7 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'recording',
     description: 'Grava uma demo caseira a partir de uma música.',
-    effortOptions: [{ label: 'Demo caseira', durationTurns: 1, costModifier: 1 }],
+    effortOptions: [{ label: 'Demo caseira', durationTurns: 3, costModifier: 1 }],
     requires: { songs: 1 },
     outcome: { metrics: { cash: -100, reputation: 2, fans: 20 }, variance: 0.2 },
   },
@@ -91,8 +92,8 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'recording',
     description: 'Grava e lança um single.',
     effortOptions: [
-      { label: 'Single', durationTurns: 2, costModifier: 1 },
-      { label: 'Single caprichado', durationTurns: 3, costModifier: 1.6 },
+      { label: 'Single', durationTurns: 10, costModifier: 1 },
+      { label: 'Single caprichado', durationTurns: 16, costModifier: 1.6 },
     ],
     requires: { songs: 1 },
     outcome: { metrics: { cash: -300, reputation: 4, fans: 120 }, variance: 0.2 },
@@ -104,8 +105,8 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'recording',
     description: 'Grava um álbum completo a partir de várias músicas.',
     effortOptions: [
-      { label: 'Álbum', durationTurns: 4, costModifier: 1 },
-      { label: 'Álbum caprichado', durationTurns: 6, costModifier: 1.7 },
+      { label: 'Álbum', durationTurns: 35, costModifier: 1 },
+      { label: 'Álbum caprichado', durationTurns: 50, costModifier: 1.7 },
     ],
     requires: { songs: 3 },
     outcome: { metrics: { cash: -1200, reputation: 12, fans: 600 }, variance: 0.25 },
@@ -126,8 +127,8 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'tour',
     description: 'Sai em turnê: muito retorno, muito desgaste.',
     effortOptions: [
-      { label: 'Mini-turnê', durationTurns: 3, costModifier: 1 },
-      { label: 'Turnê nacional', durationTurns: 6, costModifier: 1.5 },
+      { label: 'Mini-turnê', durationTurns: 14, costModifier: 1 },
+      { label: 'Turnê nacional', durationTurns: 45, costModifier: 1.5 },
     ],
     requires: { reputation: 30 },
     outcome: { metrics: { cash: 1500, reputation: 8, fans: 500, fatigue: 45 }, variance: 0.25 },
@@ -138,7 +139,7 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'background',
     category: 'marketing',
     description: 'Campanha de divulgação que roda em paralelo.',
-    effortOptions: [{ label: 'Campanha', durationTurns: 2, costModifier: 1 }],
+    effortOptions: [{ label: 'Campanha', durationTurns: 14, costModifier: 1 }],
     outcome: { metrics: { cash: -200, fans: 80 }, variance: 0.2 },
   },
   {
@@ -147,7 +148,7 @@ export const ACTIONS: readonly ActionDef[] = [
     lane: 'main',
     category: 'rest',
     description: 'A banda descansa e recupera energia.',
-    effortOptions: [{ label: 'Descanso', durationTurns: 1, costModifier: 1 }],
+    effortOptions: [{ label: 'Descanso', durationTurns: 5, costModifier: 1 }],
     outcome: { metrics: { fatigue: -30 }, variance: 0 },
     allowWhenFatigued: true,
   },

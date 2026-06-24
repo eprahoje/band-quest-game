@@ -111,28 +111,43 @@ describe('game store', () => {
     })
   })
 
-  describe('advanceTurn', () => {
-    it('increments turn counter', () => {
+  describe('advancing time', () => {
+    it('advances 1 day when nothing is active (advanceToNextCompletion)', () => {
       const store = useGameStore()
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
-      store.advanceTurn()
+      store.advanceToNextCompletion()
       expect(store.turn).toBe(2)
+    })
+
+    it('advanceDays jumps the clock by the given number of days', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.advanceDays(10)
+      expect(store.turn).toBe(11)
     })
   })
 
-  describe('calendar (turn = week)', () => {
-    it('maps turn 1 to year 1 / week 1', () => {
+  describe('calendar (turn = day)', () => {
+    it('maps turn 1 to year 1 / month 1 / day 1', () => {
       const store = useGameStore()
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
-      expect(store.calendar).toEqual({ year: 1, week: 1 })
+      expect(store.calendar).toEqual({ year: 1, month: 1, monthName: 'Janeiro', day: 1 })
     })
 
-    it('rolls into the next year after 52 weeks', () => {
+    it('rolls into the next month after 30 days', () => {
       const store = useGameStore()
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
-      for (let i = 0; i < 52; i++) store.advanceTurn() // turn 1 -> 53
-      expect(store.turn).toBe(53)
-      expect(store.calendar).toEqual({ year: 2, week: 1 })
+      store.advanceDays(30) // turn 1 -> 31
+      expect(store.turn).toBe(31)
+      expect(store.calendar).toMatchObject({ year: 1, month: 2, monthName: 'Fevereiro', day: 1 })
+    })
+
+    it('rolls into the next year after 360 days', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.advanceDays(360) // turn 1 -> 361
+      expect(store.turn).toBe(361)
+      expect(store.calendar).toMatchObject({ year: 2, month: 1, day: 1 })
     })
   })
 
@@ -153,34 +168,33 @@ describe('game store', () => {
       expect(second.ok).toBe(false)
     })
 
-    it('completes a finished action on advanceTurn and applies its outcome', () => {
+    it('completes a finished action and applies its outcome', () => {
       const store = freshGame()
       const cashBefore = store.stats.cash
-      store.startAction('play-show') // duração 1
-      store.advanceTurn()
+      store.startAction('play-show') // duração 1 dia
+      store.advanceToNextCompletion()
       expect(store.activeActions).toHaveLength(0)
       expect(store.stats.cash).toBeGreaterThan(cashBefore)
       expect(store.stats.fans).toBeGreaterThan(0)
       expect(store.recentEvents[0]?.category).toBe('show')
     })
 
-    it('keeps a multi-turn action active until its duration elapses', () => {
+    it('keeps a multi-day action active until its duration elapses', () => {
       const store = freshGame()
-      store.startAction('compose') // duração 2, produz 1 música
-      store.advanceTurn()
+      store.startAction('compose') // duração em dias, produz 1 música
+      store.advanceDays(1)
       expect(store.activeActions).toHaveLength(1)
       expect(store.songs).toBe(0)
-      store.advanceTurn()
+      store.advanceToNextCompletion() // salta o restante até concluir
       expect(store.activeActions).toHaveLength(0)
       expect(store.songs).toBe(1)
     })
 
     it('consumes a song when starting a recording that requires it', () => {
       const store = freshGame()
-      // produz uma música via compose (2 turnos)
+      // produz uma música via compose
       store.startAction('compose')
-      store.advanceTurn()
-      store.advanceTurn()
+      store.advanceToNextCompletion()
       expect(store.songs).toBe(1)
       const rec = store.startAction('record-demo') // requer 1 música
       expect(rec.ok).toBe(true)
@@ -207,7 +221,7 @@ describe('game store', () => {
       // descansar NÃO pode ser bloqueado pela fadiga (playtest 2026-06-24, ponto 2)
       expect(store.canStartAction('rest').ok).toBe(true)
       expect(store.startAction('rest').ok).toBe(true)
-      store.advanceTurn()
+      store.advanceToNextCompletion()
       expect(store.stats.fatigue).toBe(60) // 90 - 30
       expect(store.isFatigued).toBe(false)
     })
@@ -270,7 +284,7 @@ describe('game store', () => {
       const store = useGameStore()
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
       store.logEvent('show', 'Primeiro show!')
-      store.advanceTurn()
+      store.advanceDays(1)
       store.logEvent('recording', 'Gravamos a demo.')
       expect(store.events).toHaveLength(3)
       const ids = store.events.map((e) => e.id)
