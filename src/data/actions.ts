@@ -46,6 +46,9 @@ export interface ActionDef {
   requires?: ActionRequirements
   produces?: ActionProduction
   outcome: ActionOutcome
+  // Ações de recuperação (ex.: descansar) podem ser iniciadas mesmo com a banda
+  // exausta — caso contrário a fadiga vira um soft-lock (playtest 2026-06-24, ponto 2).
+  allowWhenFatigued?: boolean
 }
 
 export const ACTIONS: readonly ActionDef[] = [
@@ -146,6 +149,7 @@ export const ACTIONS: readonly ActionDef[] = [
     description: 'A banda descansa e recupera energia.',
     effortOptions: [{ label: 'Descanso', durationTurns: 1, costModifier: 1 }],
     outcome: { metrics: { fatigue: -30 }, variance: 0 },
+    allowWhenFatigued: true,
   },
 ]
 

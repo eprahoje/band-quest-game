@@ -147,7 +147,9 @@ export const useGameStore = defineStore('game', () => {
     const action = getAction(actionId)
     if (action.lane === 'main') {
       if (activeMainAction.value) return { ok: false, reason: 'Já há uma ação principal em andamento.' }
-      if (isFatigued.value) return { ok: false, reason: 'A banda está exausta. Descanse primeiro.' }
+      if (isFatigued.value && !action.allowWhenFatigued) {
+        return { ok: false, reason: 'A banda está exausta. Descanse primeiro.' }
+      }
     } else if (activeActions.value.some((a) => a.actionId === actionId)) {
       return { ok: false, reason: 'Essa ação já está em andamento.' }
     }

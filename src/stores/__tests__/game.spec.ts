@@ -200,6 +200,18 @@ describe('game store', () => {
       expect(store.canStartAction('play-show').ok).toBe(false)
     })
 
+    it('allows resting even when fatigued (no soft-lock) and recovers energy', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fatigue: 90 })
+      expect(store.isFatigued).toBe(true)
+      // descansar NÃO pode ser bloqueado pela fadiga (playtest 2026-06-24, ponto 2)
+      expect(store.canStartAction('rest').ok).toBe(true)
+      expect(store.startAction('rest').ok).toBe(true)
+      store.advanceTurn()
+      expect(store.stats.fatigue).toBe(60) // 90 - 30
+      expect(store.isFatigued).toBe(false)
+    })
+
     it('runs a background action in parallel with a main action', () => {
       const store = freshGame()
       expect(store.startAction('play-show').ok).toBe(true)
