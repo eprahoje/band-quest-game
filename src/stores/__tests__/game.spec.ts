@@ -84,10 +84,16 @@ describe('game store', () => {
       expect(store.stats.fatigue).toBe(100)
     })
 
-    it('does not allow cash below zero', () => {
+    it('allows cash to go negative (debt) — feature 0003', () => {
       const store = useGameStore()
       store.applyStatDelta({ cash: -99999 })
-      expect(store.stats.cash).toBe(0)
+      expect(store.stats.cash).toBe(500 - 99999)
+    })
+
+    it('still floors fans at zero', () => {
+      const store = useGameStore()
+      store.applyStatDelta({ fans: -50 })
+      expect(store.stats.fans).toBe(0)
     })
   })
 
@@ -111,6 +117,109 @@ describe('game store', () => {
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
       store.advanceTurn()
       expect(store.turn).toBe(2)
+    })
+  })
+
+  describe('calendar (turn = week)', () => {
+    it('maps turn 1 to year 1 / week 1', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      expect(store.calendar).toEqual({ year: 1, week: 1 })
+    })
+
+    it('rolls into the next year after 52 weeks', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      for (let i = 0; i < 52; i++) store.advanceTurn() // turn 1 -> 53
+      expect(store.turn).toBe(53)
+      expect(store.calendar).toEqual({ year: 2, week: 1 })
+    })
+  })
+
+  describe('actions engine', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5) // determinístico
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('queues a main action and blocks a second main action', () => {
+      const store = freshGame()
+      expect(store.startAction('play-show').ok).toBe(true)
+      expect(store.activeMainAction?.actionId).toBe('play-show')
+      expect(store.canStartMain).toBe(false)
+      const second = store.startAction('rehearse')
+      expect(second.ok).toBe(false)
+    })
+
+    it('completes a finished action on advanceTurn and applies its outcome', () => {
+      const store = freshGame()
+      const cashBefore = store.stats.cash
+      store.startAction('play-show') // duração 1
+      store.advanceTurn()
+      expect(store.activeActions).toHaveLength(0)
+      expect(store.stats.cash).toBeGreaterThan(cashBefore)
+      expect(store.stats.fans).toBeGreaterThan(0)
+      expect(store.recentEvents[0]?.category).toBe('show')
+    })
+
+    it('keeps a multi-turn action active until its duration elapses', () => {
+      const store = freshGame()
+      store.startAction('compose') // duração 2, produz 1 música
+      store.advanceTurn()
+      expect(store.activeActions).toHaveLength(1)
+      expect(store.songs).toBe(0)
+      store.advanceTurn()
+      expect(store.activeActions).toHaveLength(0)
+      expect(store.songs).toBe(1)
+    })
+
+    it('consumes a song when starting a recording that requires it', () => {
+      const store = freshGame()
+      // produz uma música via compose (2 turnos)
+      store.startAction('compose')
+      store.advanceTurn()
+      store.advanceTurn()
+      expect(store.songs).toBe(1)
+      const rec = store.startAction('record-demo') // requer 1 música
+      expect(rec.ok).toBe(true)
+      expect(store.songs).toBe(0)
+    })
+
+    it('blocks recording when there are not enough songs', () => {
+      const store = freshGame()
+      const rec = store.startAction('record-album') // requer 3 músicas
+      expect(rec.ok).toBe(false)
+    })
+
+    it('blocks a main action when the band is fatigued', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fatigue: 80 })
+      expect(store.isFatigued).toBe(true)
+      expect(store.canStartAction('play-show').ok).toBe(false)
+    })
+
+    it('runs a background action in parallel with a main action', () => {
+      const store = freshGame()
+      expect(store.startAction('play-show').ok).toBe(true)
+      expect(store.startAction('marketing').ok).toBe(true)
+      expect(store.activeActions).toHaveLength(2)
+    })
+
+    it('requires minimum reputation for a tour', () => {
+      const store = freshGame()
+      expect(store.startAction('tour').ok).toBe(false) // reputação inicial 10
+      store.applyStatDelta({ reputation: 25 }) // -> 35
+      expect(store.canStartAction('tour').ok).toBe(true)
+    })
+
+    it('clears active actions and songs on a new game', () => {
+      const store = freshGame()
+      store.startAction('play-show')
+      store.startGame({ bandName: 'C', genre: 'Pop', originTrait: 'Garagem' })
+      expect(store.activeActions).toHaveLength(0)
+      expect(store.songs).toBe(0)
     })
   })
 

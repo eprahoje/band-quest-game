@@ -2,67 +2,98 @@
   <main class="game-view">
     <header class="game-view__header">
       <h1 class="game-view__band">{{ store.bandName }}</h1>
-      <span class="turn-badge">Turno {{ store.turn }}</span>
+      <span class="turn-badge">Ano {{ store.calendar.year }} · Semana {{ store.calendar.week }}</span>
     </header>
 
     <StatsPanel />
 
+    <section class="loop-bar" aria-label="Calendário">
+      <span class="loop-bar__songs">Músicas prontas: <strong>{{ store.songs }}</strong></span>
+      <button class="advance-btn" type="button" @click="advance">Avançar semana ›</button>
+    </section>
+
     <section class="roster" aria-label="Membros da banda">
-      <h2 class="roster__title">Banda</h2>
+      <h2 class="section-title">Banda</h2>
       <div class="roster__grid">
         <MemberCard v-for="m in store.members" :key="m.memberId" :member="m" />
       </div>
     </section>
 
-    <div class="game-view__actions">
-      <button
-        v-for="action in actions"
-        :key="action.label"
-        class="action-btn"
-        @click="action.run"
-      >
-        {{ action.label }}
-      </button>
-    </div>
+    <section class="in-progress" aria-label="Ações em andamento">
+      <h2 class="section-title">Em andamento</h2>
+      <p v-if="store.activeActions.length === 0" class="in-progress__empty">
+        Nada em andamento. Escolha uma ação e avance as semanas.
+      </p>
+      <ul v-else class="in-progress__list">
+        <li v-for="a in store.activeActions" :key="a.actionId" class="progress-item">
+          <span class="progress-item__name">{{ a.name }}</span>
+          <span class="progress-item__effort">{{ a.effortLabel }}</span>
+          <span class="progress-item__remaining">
+            {{ a.turnsRemaining }}/{{ a.totalTurns }} sem
+          </span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="actions" aria-label="Ações disponíveis">
+      <h2 class="section-title">Ações</h2>
+      <div class="actions__grid">
+        <article
+          v-for="group in actionGroups"
+          :key="group.action.id"
+          class="action-card"
+          :class="{ 'action-card--disabled': group.disabled }"
+        >
+          <header class="action-card__head">
+            <span class="action-card__name">{{ group.action.name }}</span>
+            <span v-if="group.action.lane === 'background'" class="action-card__tag">paralela</span>
+          </header>
+          <p class="action-card__desc">{{ group.action.description }}</p>
+          <p v-if="group.disabled && group.reason" class="action-card__reason">{{ group.reason }}</p>
+          <div class="action-card__efforts">
+            <button
+              v-for="effort in group.action.effortOptions"
+              :key="effort.label"
+              type="button"
+              class="effort-btn"
+              :disabled="group.disabled"
+              @click="start(group.action, effort)"
+            >
+              {{ effort.label }} · {{ effort.durationTurns }} sem
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
 
     <EventFeed />
   </main>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import StatsPanel from '@/components/StatsPanel.vue'
 import EventFeed from '@/components/EventFeed.vue'
 import MemberCard from '@/components/MemberCard.vue'
 import { useGameStore } from '@/stores/game'
+import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'
 
 const store = useGameStore()
 
-const actions = [
-  {
-    label: 'Tocar um show',
-    run() {
-      store.applyStatDelta({ reputation: 4, cash: 150, fans: 30, fatigue: 15 })
-      store.logEvent('show', 'A banda tocou em um bar lotado e ganhou novos fãs.')
-      store.advanceTurn()
-    },
-  },
-  {
-    label: 'Gravar demo',
-    run() {
-      store.applyStatDelta({ reputation: 2, cash: -120, fatigue: 10 })
-      store.logEvent('recording', 'Vocês gravaram uma demo no estúdio do bairro.')
-      store.advanceTurn()
-    },
-  },
-  {
-    label: 'Descansar',
-    run() {
-      store.applyStatDelta({ fatigue: -30 })
-      store.logEvent('milestone', 'A banda tirou uns dias de folga e recuperou energia.')
-      store.advanceTurn()
-    },
-  },
-]
+const actionGroups = computed(() =>
+  ACTIONS.map((action) => {
+    const check = store.canStartAction(action.id)
+    return { action, disabled: !check.ok, reason: check.reason }
+  }),
+)
+
+function start(action: ActionDef, effort: ActionEffortOption) {
+  store.startAction(action.id, effort.label)
+}
+
+function advance() {
+  store.advanceTurn()
+}
 </script>
 
 <style scoped>
@@ -98,18 +129,45 @@ const actions = [
   background: var(--bq-spotlight-dim);
 }
 
-.roster {
+.loop-bar {
   display: flex;
-  flex-direction: column;
-  gap: var(--bq-space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bq-space-4);
+  padding: var(--bq-space-3) var(--bq-space-4);
+  background: var(--bq-bg-surface);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-md);
 }
 
-.roster__title {
+.loop-bar__songs {
+  font-size: var(--bq-text-sm);
+  color: var(--bq-text-muted);
+}
+
+.advance-btn {
+  padding: var(--bq-space-2) var(--bq-space-5);
+  font-size: var(--bq-text-sm);
+  font-weight: var(--bq-weight-semibold);
+  color: var(--bq-bg);
+  background: var(--bq-spotlight);
+  border: none;
+  border-radius: var(--bq-radius-md);
+  cursor: pointer;
+  transition: filter var(--bq-dur-base) var(--bq-ease);
+}
+
+.advance-btn:hover {
+  filter: brightness(1.08);
+}
+
+.section-title {
   font-size: var(--bq-text-sm);
   font-weight: var(--bq-weight-semibold);
   text-transform: uppercase;
   letter-spacing: var(--bq-tracking-caps);
   color: var(--bq-text-muted);
+  margin-bottom: var(--bq-space-3);
 }
 
 .roster__grid {
@@ -118,28 +176,122 @@ const actions = [
   gap: var(--bq-space-4);
 }
 
-.game-view__actions {
+.in-progress__empty {
+  font-size: var(--bq-text-sm);
+  color: var(--bq-text-faint);
+}
+
+.in-progress__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--bq-space-2);
 }
 
-.action-btn {
-  padding: var(--bq-space-3) var(--bq-space-5);
-  font-size: var(--bq-text-sm);
-  font-weight: var(--bq-weight-semibold);
-  color: var(--bq-text);
+.progress-item {
+  display: flex;
+  align-items: center;
+  gap: var(--bq-space-3);
+  padding: var(--bq-space-2) var(--bq-space-3);
   background: var(--bq-bg-surface);
   border: 1px solid var(--bq-border);
   border-radius: var(--bq-radius-md);
+}
+
+.progress-item__name {
+  font-weight: var(--bq-weight-semibold);
+  font-size: var(--bq-text-sm);
+}
+
+.progress-item__effort {
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-muted);
+}
+
+.progress-item__remaining {
+  margin-left: auto;
+  font-family: var(--bq-font-mono);
+  font-size: var(--bq-text-xs);
+  color: var(--bq-spotlight);
+}
+
+.actions__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--bq-space-3);
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bq-space-2);
+  padding: var(--bq-space-4);
+  background: var(--bq-bg-surface);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-md);
+}
+
+.action-card--disabled {
+  opacity: 0.55;
+}
+
+.action-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--bq-space-2);
+}
+
+.action-card__name {
+  font-weight: var(--bq-weight-semibold);
+}
+
+.action-card__tag {
+  font-size: var(--bq-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-caps);
+  color: var(--bq-stat-cash);
+}
+
+.action-card__desc {
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-muted);
+  line-height: var(--bq-leading-snug);
+}
+
+.action-card__reason {
+  font-size: var(--bq-text-xs);
+  color: var(--bq-ember);
+}
+
+.action-card__efforts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bq-space-2);
+  margin-top: auto;
+}
+
+.effort-btn {
+  padding: var(--bq-space-2) var(--bq-space-3);
+  font-size: var(--bq-text-xs);
+  font-weight: var(--bq-weight-semibold);
+  color: var(--bq-text);
+  background: var(--bq-bg-elevated);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-sm);
   cursor: pointer;
   transition:
     border-color var(--bq-dur-base) var(--bq-ease),
     color var(--bq-dur-base) var(--bq-ease);
 }
 
-.action-btn:hover {
+.effort-btn:hover:not(:disabled) {
   border-color: var(--bq-spotlight);
   color: var(--bq-spotlight);
+}
+
+.effort-btn:disabled {
+  cursor: not-allowed;
 }
 </style>

@@ -36,6 +36,9 @@ import {
   IconBriefcase,
   IconTrophy,
   IconAlertTriangle,
+  IconSpeakerphone,
+  IconBarbell,
+  IconMoon,
 } from '@tabler/icons-vue'
 import { useGameStore } from '@/stores/game'
 import type { EventCategory } from '@/stores/game'
@@ -49,6 +52,9 @@ const categoryMeta: Record<EventCategory, { icon: Component; label: string; acce
   negotiation: { icon: IconBriefcase, label: 'Negociação', accent: 'var(--bq-stat-cash)' },
   milestone: { icon: IconTrophy, label: 'Marco', accent: 'var(--bq-spotlight)' },
   setback: { icon: IconAlertTriangle, label: 'Revés', accent: 'var(--bq-negative)' },
+  marketing: { icon: IconSpeakerphone, label: 'Marketing', accent: 'var(--bq-stat-cash)' },
+  practice: { icon: IconBarbell, label: 'Ensaio', accent: 'var(--bq-stat-rep)' },
+  rest: { icon: IconMoon, label: 'Descanso', accent: 'var(--bq-stat-fatigue)' },
 }
 </script>
 
