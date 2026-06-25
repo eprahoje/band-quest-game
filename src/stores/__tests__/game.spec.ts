@@ -333,6 +333,72 @@ describe('game store', () => {
     })
   })
 
+  describe('session modes & outcomes (0010)', () => {
+    function freshGame(durationYears = 10) {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({
+        bandName: 'B',
+        genre: 'Rock',
+        originTrait: 'Garagem',
+        sessionMode: 'timed',
+        durationYears,
+      })
+      return store
+    }
+
+    it('stores the chosen session config and defaults to timed/10', () => {
+      const store = useGameStore()
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      expect(store.sessionMode).toBe('timed')
+      expect(store.durationYears).toBe(10)
+      expect(store.endTurn).toBe(3600) // 10 anos × 360 dias
+      expect(store.outcome).toBeNull()
+    })
+
+    it('ends a timed session with a star rating when the time is up', () => {
+      const store = freshGame(10)
+      store.applyStatDelta({ cash: 100_000 }) // solvente, para não falir antes
+      store.advanceDays(3600) // chega ao fim dos 10 anos
+      expect(store.currentView).toBe('result')
+      expect(store.outcome?.type).toBe('success')
+      expect(store.outcome?.stars).toBeGreaterThanOrEqual(1)
+      expect(store.outcome?.stars).toBeLessThanOrEqual(5)
+    })
+
+    it('ends in defeat by bankruptcy after sustained negative cash', () => {
+      const store = freshGame(10)
+      store.advanceDays(120) // 4 meses de custos sem receita -> caixa no vermelho
+      expect(store.stats.cash).toBeLessThan(0)
+      expect(store.currentView).toBe('result')
+      expect(store.outcome?.type).toBe('defeat')
+      expect(store.outcome?.reason).toBe('Falência')
+    })
+
+    it('does not advance time after the session has ended', () => {
+      const store = freshGame(10)
+      store.advanceDays(120) // termina em falência
+      const turnAtEnd = store.turn
+      store.advanceDays(30)
+      expect(store.turn).toBe(turnAtEnd)
+    })
+
+    it('free mode has no scheduled end', () => {
+      const store = useGameStore()
+      store.startGame({
+        bandName: 'B',
+        genre: 'Rock',
+        originTrait: 'Garagem',
+        sessionMode: 'free',
+        durationYears: 0,
+      })
+      store.applyStatDelta({ cash: 100_000 })
+      store.advanceDays(4000)
+      expect(store.endTurn).toBe(0)
+      expect(store.currentView).toBe('game')
+    })
+  })
+
   describe('events', () => {
     it('starts with no events before a game begins', () => {
       const store = useGameStore()

@@ -95,7 +95,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import StatsPanel from '@/components/StatsPanel.vue'
 import EventFeed from '@/components/EventFeed.vue'
 import MemberCard from '@/components/MemberCard.vue'
@@ -103,6 +104,15 @@ import { useGameStore } from '@/stores/game'
 import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'
 
 const store = useGameStore()
+const router = useRouter()
+
+// Quando a sessão termina (vitória/derrota), vai para a tela de resultado (0010).
+watch(
+  () => store.currentView,
+  (view) => {
+    if (view === 'result') router.push('/result')
+  },
+)
 
 const actionGroups = computed(() =>
   ACTIONS.map((action) => {

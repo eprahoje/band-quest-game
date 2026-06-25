@@ -2,6 +2,12 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { createDefaultRoster, type BandMember } from '@/data/cast'
 import { getAction, resolveEffort, resolveOutcome, type ActionLane } from '@/data/actions'
+import {
+  computeScore,
+  computeStars,
+  type SessionMode,
+  type SessionOutcome,
+} from '@/data/session'
 
 export interface BandStats {
   reputation: number // 0–100
@@ -67,6 +73,9 @@ export const START_YEAR = 2000
 // Recuperação passiva de fadiga por dia avançado (Playtest 02, ponto 8).
 const PASSIVE_FATIGUE_RECOVERY_PER_DAY = 1
 
+// Derrota por falência: caixa negativo por este número de dias consecutivos (0010).
+const BANKRUPTCY_DAYS = 90
+
 export const MONTH_NAMES = [
   'Janeiro',
   'Fevereiro',
@@ -107,7 +116,12 @@ export const useGameStore = defineStore('game', () => {
   const genre = ref('')
   const originTrait = ref('')
   const turn = ref(0)
-  const currentView = ref<'start' | 'game'>('start')
+  const currentView = ref<'start' | 'game' | 'result'>('start')
+  // Configuração e desfecho da sessão (feature 0010).
+  const sessionMode = ref<SessionMode>('timed')
+  const durationYears = ref(10)
+  const outcome = ref<SessionOutcome | null>(null)
+  let negativeCashStreak = 0
 
   const stats = ref<BandStats>({ ...INITIAL_STATS })
   const members = ref<BandMember[]>([])
@@ -174,10 +188,20 @@ export const useGameStore = defineStore('game', () => {
     Math.round(members.value.length * MEMBER_BASE_MONTHLY_COST * (1 + stats.value.reputation / 100)),
   )
 
-  function startGame(payload: { bandName: string; genre: string; originTrait: string }) {
+  function startGame(payload: {
+    bandName: string
+    genre: string
+    originTrait: string
+    sessionMode?: SessionMode
+    durationYears?: number
+  }) {
     bandName.value = payload.bandName
     genre.value = payload.genre
     originTrait.value = payload.originTrait
+    sessionMode.value = payload.sessionMode ?? 'timed'
+    durationYears.value = payload.durationYears ?? 10
+    outcome.value = null
+    negativeCashStreak = 0
     stats.value = { ...INITIAL_STATS }
     members.value = createDefaultRoster()
     events.value = []
@@ -189,6 +213,11 @@ export const useGameStore = defineStore('game', () => {
     currentView.value = 'game'
     logEvent('milestone', `${payload.bandName} foi formada. Boa sorte!`)
   }
+
+  // Último turno (dia) de um modo temporizado. 0 = sem fim (modo livre).
+  const endTurn = computed(() =>
+    sessionMode.value === 'timed' ? durationYears.value * DAYS_PER_YEAR : 0,
+  )
 
   function applyStatDelta(delta: Partial<BandStats>) {
     const s = stats.value
@@ -329,9 +358,31 @@ export const useGameStore = defineStore('game', () => {
     if (decay > 0) applyStatDelta({ reputation: -decay })
   }
 
+  function endSession(result: SessionOutcome) {
+    outcome.value = result
+    currentView.value = 'result'
+  }
+
+  // Checa derrota (falência) e fim por tempo (modo temporizado) após um avanço.
+  function checkEndConditions(days: number) {
+    if (currentView.value !== 'game') return
+    // Falência: caixa negativo por BANKRUPTCY_DAYS dias consecutivos.
+    if (stats.value.cash < 0) negativeCashStreak += days
+    else negativeCashStreak = 0
+    if (negativeCashStreak >= BANKRUPTCY_DAYS) {
+      endSession({ type: 'defeat', reason: 'Falência' })
+      return
+    }
+    // Fim por tempo (sucesso): nota em estrelas.
+    if (endTurn.value > 0 && turn.value >= endTurn.value) {
+      const score = computeScore(stats.value)
+      endSession({ type: 'success', score, stars: computeStars(score, durationYears.value) })
+    }
+  }
+
   // Avança `days` dias: cobra custos mensais, aplica decay, e conclui ações prontas.
   function advanceDays(days: number) {
-    if (days <= 0) return
+    if (days <= 0 || currentView.value !== 'game') return
     const oldTurn = turn.value
     turn.value += days
 
@@ -353,6 +404,8 @@ export const useGameStore = defineStore('game', () => {
       // atividade pública zera a inatividade (reputação volta a "contar")
       if (PUBLIC_ACTION_IDS.has(a.actionId)) inactiveDays.value = 0
     }
+
+    checkEndConditions(days)
   }
 
   // Salta o relógio até a próxima conclusão de ação (1 dia se nada estiver ativo).
@@ -370,6 +423,8 @@ export const useGameStore = defineStore('game', () => {
     songs.value = 0
     activeActions.value = []
     inactiveDays.value = 0
+    outcome.value = null
+    negativeCashStreak = 0
     eventSeq = 0
     turn.value = 0
     currentView.value = 'start'
@@ -386,6 +441,10 @@ export const useGameStore = defineStore('game', () => {
     originTrait,
     turn,
     currentView,
+    sessionMode,
+    durationYears,
+    outcome,
+    endTurn,
     stats,
     members,
     events,
