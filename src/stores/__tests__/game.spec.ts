@@ -321,13 +321,15 @@ describe('game store', () => {
       expect(store.stats.fatigue).toBe(40)
     })
 
-    it('completion events report the applied effects (Playtest 02)', () => {
+    it('completion events report the applied effects as chips (Playtest 02)', () => {
       const store = freshGame()
       store.startAction('play-show')
       store.advanceToNextCompletion()
-      const msg = store.recentEvents[0]?.message ?? ''
-      expect(msg).toContain('fãs')
-      expect(msg).toContain('R$')
+      const effects = store.recentEvents[0]?.effects ?? []
+      expect(effects.some((e) => e.label.includes('fãs') && e.tone === 'pos')).toBe(true)
+      expect(effects.some((e) => e.label.includes('R$'))).toBe(true)
+      // fadiga subindo é reportada como efeito negativo
+      expect(effects.some((e) => e.label.includes('fadiga') && e.tone === 'neg')).toBe(true)
     })
   })
 

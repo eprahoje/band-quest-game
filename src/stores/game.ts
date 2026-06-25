@@ -24,11 +24,18 @@ export type EventCategory =
   | 'practice'
   | 'rest'
 
+// Efeito reportado num evento, renderizado como chip (design-system: .tag pos/neg).
+export interface EventEffect {
+  label: string
+  tone: 'pos' | 'neg'
+}
+
 export interface GameEvent {
   id: string
   turn: number
   category: EventCategory
   message: string
+  effects?: EventEffect[]
 }
 
 // Ação em progresso no calendário (feature 0014).
@@ -194,13 +201,28 @@ export const useGameStore = defineStore('game', () => {
       s.fatigue = Math.max(0, Math.min(100, s.fatigue + delta.fatigue))
   }
 
-  function logEvent(category: EventCategory, message: string) {
+  function logEvent(category: EventCategory, message: string, effects?: EventEffect[]) {
     events.value.push({
       id: String(++eventSeq),
       turn: turn.value,
       category,
       message,
+      ...(effects && effects.length ? { effects } : {}),
     })
+  }
+
+  // Converte os deltas aplicados em chips de efeito (cor por "bom/ruim").
+  function effectsFromDeltas(deltas: Partial<BandStats>): EventEffect[] {
+    const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`)
+    const out: EventEffect[] = []
+    if (deltas.cash)
+      out.push({ label: `${deltas.cash > 0 ? '+' : '-'}R$ ${Math.abs(deltas.cash)}`, tone: deltas.cash > 0 ? 'pos' : 'neg' })
+    if (deltas.fans) out.push({ label: `${signed(deltas.fans)} fãs`, tone: deltas.fans > 0 ? 'pos' : 'neg' })
+    if (deltas.reputation)
+      out.push({ label: `${signed(deltas.reputation)} reputação`, tone: deltas.reputation > 0 ? 'pos' : 'neg' })
+    // fadiga: subir é ruim (neg), descansar/recuperar é bom (pos)
+    if (deltas.fatigue) out.push({ label: `${signed(deltas.fatigue)} fadiga`, tone: deltas.fatigue > 0 ? 'neg' : 'pos' })
+    return out
   }
 
   // Verifica se uma ação pode iniciar agora (sem alterar o estado).
@@ -257,19 +279,8 @@ export const useGameStore = defineStore('game', () => {
     })
     applyStatDelta(deltas as Partial<BandStats>)
     if (action.produces?.songs) songs.value += action.produces.songs
-    // O evento reporta os efeitos aplicados (Playtest 02, ponto 9).
-    logEvent(active.category, `${completionMessage(active)}${formatDeltas(deltas)}`)
-  }
-
-  // Monta o sufixo de efeitos de um evento, ex.: " (+R$ 172 · +32 fãs · +1 rep)".
-  function formatDeltas(deltas: Partial<BandStats>): string {
-    const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`)
-    const parts: string[] = []
-    if (deltas.cash) parts.push(`${deltas.cash > 0 ? '+' : '-'}R$ ${Math.abs(deltas.cash)}`)
-    if (deltas.fans) parts.push(`${signed(deltas.fans)} fãs`)
-    if (deltas.reputation) parts.push(`${signed(deltas.reputation)} rep`)
-    if (deltas.fatigue) parts.push(`${signed(deltas.fatigue)} fadiga`)
-    return parts.length ? ` (${parts.join(' · ')})` : ''
+    // O evento reporta os efeitos aplicados como chips (Playtest 02, ponto 9).
+    logEvent(active.category, completionMessage(active), effectsFromDeltas(deltas))
   }
 
   function completionMessage(active: ActiveAction): string {
@@ -299,7 +310,9 @@ export const useGameStore = defineStore('game', () => {
       const cost = monthlyMemberCost.value
       if (cost > 0) {
         applyStatDelta({ cash: -cost })
-        logEvent('negotiation', `Custos mensais da banda: -R$ ${cost}.`)
+        logEvent('negotiation', 'Custos mensais da banda.', [
+          { label: `-R$ ${cost}`, tone: 'neg' },
+        ])
       }
     }
   }

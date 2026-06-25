@@ -17,7 +17,17 @@
           <component :is="categoryMeta[event.category].icon" :size="18" stroke-width="2" />
         </span>
         <div class="event-item__body">
-          <p class="event-item__message">{{ event.message }}</p>
+          <p class="event-item__message">
+            {{ event.message }}
+            <span
+              v-for="(effect, i) in event.effects"
+              :key="i"
+              class="event-tag"
+              :class="effect.tone === 'pos' ? 'event-tag--pos' : 'event-tag--neg'"
+            >
+              {{ effect.label }}
+            </span>
+          </p>
           <span class="event-item__meta">
             {{ categoryMeta[event.category].label }} · Turno {{ event.turn }}
           </span>
@@ -133,6 +143,27 @@ const categoryMeta: Record<EventCategory, { icon: Component; label: string; acce
   font-size: var(--bq-text-sm);
   line-height: var(--bq-leading-snug);
   color: var(--bq-text);
+}
+
+/* Chip de efeito — espelha .tag (design-system/components/event-feed.html). */
+.event-tag {
+  display: inline-block;
+  font-size: var(--bq-text-xs);
+  font-weight: var(--bq-weight-semibold);
+  padding: 1px var(--bq-space-2);
+  border-radius: var(--bq-radius-pill);
+  margin-left: var(--bq-space-2);
+  white-space: nowrap;
+}
+
+.event-tag--pos {
+  color: var(--bq-positive);
+  background: color-mix(in srgb, var(--bq-positive) 16%, transparent);
+}
+
+.event-tag--neg {
+  color: var(--bq-negative);
+  background: color-mix(in srgb, var(--bq-negative) 16%, transparent);
 }
 
 .event-item__meta {
