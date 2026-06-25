@@ -3,7 +3,7 @@
     <header class="game-view__header">
       <h1 class="game-view__band">{{ store.bandName }}</h1>
       <span class="turn-badge">
-        Ano {{ store.calendar.year }} · {{ store.calendar.monthName }}, dia {{ store.calendar.day }}
+        {{ store.calendar.displayYear }} · {{ store.calendar.monthName }}, dia {{ store.calendar.day }}
       </span>
     </header>
 

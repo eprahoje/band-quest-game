@@ -43,7 +43,7 @@ export interface ActiveAction {
 }
 
 const INITIAL_STATS: BandStats = {
-  reputation: 10,
+  reputation: 0, // começa em 0; sem teto superior (Playtest 02, ponto 1)
   cash: 500,
   fans: 0,
   fatigue: 0,
@@ -53,6 +53,12 @@ const INITIAL_STATS: BandStats = {
 export const DAYS_PER_MONTH = 30
 export const MONTHS_PER_YEAR = 12
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR // 360
+
+// O jogo começa no Brasil dos anos 2000 (Playtest 02, ponto 7).
+export const START_YEAR = 2000
+
+// Recuperação passiva de fadiga por dia avançado (Playtest 02, ponto 8).
+const PASSIVE_FATIGUE_RECOVERY_PER_DAY = 1
 
 export const MONTH_NAMES = [
   'Janeiro',
@@ -116,15 +122,19 @@ export const useGameStore = defineStore('game', () => {
 
   // Calendário derivado do turno (dia). Antes de começar: ano 1, dia 0.
   const calendar = computed(() => {
-    if (turn.value < 1) return { year: 1, month: 1, monthName: MONTH_NAMES[0], day: 0 }
+    if (turn.value < 1) {
+      return { year: 1, month: 1, monthName: MONTH_NAMES[0], day: 0, displayYear: START_YEAR }
+    }
     const zero = turn.value - 1
     const dayOfYear = zero % DAYS_PER_YEAR
     const month = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1
+    const year = Math.floor(zero / DAYS_PER_YEAR) + 1
     return {
-      year: Math.floor(zero / DAYS_PER_YEAR) + 1,
+      year,
       month,
       monthName: MONTH_NAMES[month - 1] ?? MONTH_NAMES[0],
       day: (dayOfYear % DAYS_PER_MONTH) + 1,
+      displayYear: START_YEAR + year - 1,
     }
   })
 
@@ -175,8 +185,8 @@ export const useGameStore = defineStore('game', () => {
 
   function applyStatDelta(delta: Partial<BandStats>) {
     const s = stats.value
-    if (delta.reputation !== undefined)
-      s.reputation = Math.max(0, Math.min(100, s.reputation + delta.reputation))
+    // Reputação tem piso 0 e NÃO tem teto (Playtest 02, ponto 1).
+    if (delta.reputation !== undefined) s.reputation = Math.max(0, s.reputation + delta.reputation)
     // Caixa pode ficar negativo (dívida) — feature 0003.
     if (delta.cash !== undefined) s.cash = s.cash + delta.cash
     if (delta.fans !== undefined) s.fans = Math.max(0, s.fans + delta.fans)
@@ -247,7 +257,19 @@ export const useGameStore = defineStore('game', () => {
     })
     applyStatDelta(deltas as Partial<BandStats>)
     if (action.produces?.songs) songs.value += action.produces.songs
-    logEvent(active.category, completionMessage(active))
+    // O evento reporta os efeitos aplicados (Playtest 02, ponto 9).
+    logEvent(active.category, `${completionMessage(active)}${formatDeltas(deltas)}`)
+  }
+
+  // Monta o sufixo de efeitos de um evento, ex.: " (+R$ 172 · +32 fãs · +1 rep)".
+  function formatDeltas(deltas: Partial<BandStats>): string {
+    const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`)
+    const parts: string[] = []
+    if (deltas.cash) parts.push(`${deltas.cash > 0 ? '+' : '-'}R$ ${Math.abs(deltas.cash)}`)
+    if (deltas.fans) parts.push(`${signed(deltas.fans)} fãs`)
+    if (deltas.reputation) parts.push(`${signed(deltas.reputation)} rep`)
+    if (deltas.fatigue) parts.push(`${signed(deltas.fatigue)} fadiga`)
+    return parts.length ? ` (${parts.join(' · ')})` : ''
   }
 
   function completionMessage(active: ActiveAction): string {
@@ -302,6 +324,8 @@ export const useGameStore = defineStore('game', () => {
 
     chargeMonthlyCosts(oldTurn, turn.value)
     applyReputationDecay(days)
+    // Recuperação passiva de energia ao passar o tempo (Playtest 02, ponto 8).
+    applyStatDelta({ fatigue: -days * PASSIVE_FATIGUE_RECOVERY_PER_DAY })
 
     const remaining: ActiveAction[] = []
     const completed: ActiveAction[] = []

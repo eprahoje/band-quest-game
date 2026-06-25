@@ -13,7 +13,7 @@ describe('game store', () => {
       const store = useGameStore()
       expect(store.currentView).toBe('start')
       expect(store.turn).toBe(0)
-      expect(store.stats.reputation).toBe(10)
+      expect(store.stats.reputation).toBe(0)
       expect(store.stats.cash).toBe(500)
       expect(store.stats.fans).toBe(0)
       expect(store.stats.fatigue).toBe(0)
@@ -65,17 +65,17 @@ describe('game store', () => {
       const store = useGameStore()
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
       store.applyStatDelta({ reputation: 20, cash: -200, fans: 150 })
-      expect(store.stats.reputation).toBe(30)
+      expect(store.stats.reputation).toBe(20)
       expect(store.stats.cash).toBe(300)
       expect(store.stats.fans).toBe(150)
     })
 
-    it('clamps reputation between 0 and 100', () => {
+    it('floors reputation at 0 but has no upper cap (Playtest 02)', () => {
       const store = useGameStore()
       store.applyStatDelta({ reputation: 999 })
-      expect(store.stats.reputation).toBe(100)
-      store.applyStatDelta({ reputation: -999 })
-      expect(store.stats.reputation).toBe(0)
+      expect(store.stats.reputation).toBe(999) // sem teto
+      store.applyStatDelta({ reputation: -9999 })
+      expect(store.stats.reputation).toBe(0) // piso 0
     })
 
     it('clamps fatigue between 0 and 100', () => {
@@ -128,10 +128,16 @@ describe('game store', () => {
   })
 
   describe('calendar (turn = day)', () => {
-    it('maps turn 1 to year 1 / month 1 / day 1', () => {
+    it('maps turn 1 to year 1 / month 1 / day 1, starting in 2000', () => {
       const store = useGameStore()
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
-      expect(store.calendar).toEqual({ year: 1, month: 1, monthName: 'Janeiro', day: 1 })
+      expect(store.calendar).toMatchObject({
+        year: 1,
+        month: 1,
+        monthName: 'Janeiro',
+        day: 1,
+        displayYear: 2000,
+      })
     })
 
     it('rolls into the next month after 30 days', () => {
@@ -147,7 +153,7 @@ describe('game store', () => {
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
       store.advanceDays(360) // turn 1 -> 361
       expect(store.turn).toBe(361)
-      expect(store.calendar).toMatchObject({ year: 2, month: 1, day: 1 })
+      expect(store.calendar).toMatchObject({ year: 2, month: 1, day: 1, displayYear: 2001 })
     })
   })
 
@@ -221,8 +227,8 @@ describe('game store', () => {
       // descansar NÃO pode ser bloqueado pela fadiga (playtest 2026-06-24, ponto 2)
       expect(store.canStartAction('rest').ok).toBe(true)
       expect(store.startAction('rest').ok).toBe(true)
-      store.advanceToNextCompletion()
-      expect(store.stats.fatigue).toBe(60) // 90 - 30
+      store.advanceToNextCompletion() // 5 dias: -5 passivo + -30 do descanso
+      expect(store.stats.fatigue).toBe(55) // 90 - 5 - 30
       expect(store.isFatigued).toBe(false)
     })
 
@@ -235,8 +241,8 @@ describe('game store', () => {
 
     it('requires minimum reputation for a tour', () => {
       const store = freshGame()
-      expect(store.startAction('tour').ok).toBe(false) // reputação inicial 10
-      store.applyStatDelta({ reputation: 25 }) // -> 35
+      expect(store.startAction('tour').ok).toBe(false) // reputação inicial 0
+      store.applyStatDelta({ reputation: 35 }) // -> 35 (>= 30)
       expect(store.canStartAction('tour').ok).toBe(true)
     })
 
@@ -274,15 +280,15 @@ describe('game store', () => {
 
     it('monthly member cost grows with reputation', () => {
       const store = freshGame()
-      expect(store.monthlyMemberCost).toBe(440) // 4 membros × 100 × (1 + 10/100)
-      store.applyStatDelta({ reputation: 40 }) // 10 -> 50
-      expect(store.monthlyMemberCost).toBe(600) // 4 × 100 × 1.5
+      expect(store.monthlyMemberCost).toBe(400) // 4 membros × 100 × (1 + 0/100)
+      store.applyStatDelta({ reputation: 40 }) // 0 -> 40
+      expect(store.monthlyMemberCost).toBe(560) // 4 × 100 × 1.4
     })
 
     it('charges the monthly cost when a month boundary is crossed', () => {
       const store = freshGame()
       store.advanceDays(30) // turn 1 -> 31 (cruza 1 mês)
-      expect(store.stats.cash).toBe(500 - 440)
+      expect(store.stats.cash).toBe(500 - 400)
       expect(store.recentEvents[0]?.category).toBe('negotiation')
     })
 
@@ -294,9 +300,9 @@ describe('game store', () => {
 
     it('decays reputation after the inactivity grace period', () => {
       const store = freshGame()
-      store.applyStatDelta({ reputation: 40 }) // 10 -> 50, para enxergar o decay
+      store.applyStatDelta({ reputation: 40 }) // 0 -> 40, para enxergar o decay
       store.advanceDays(40) // 30 de carência + 10 inativos => -1 de reputação
-      expect(store.stats.reputation).toBe(49)
+      expect(store.stats.reputation).toBe(39)
     })
 
     it('public activity resets the inactivity counter', () => {
@@ -306,6 +312,22 @@ describe('game store', () => {
       store.startAction('play-show')
       store.advanceToNextCompletion() // show é atividade pública
       expect(store.inactiveDays).toBe(0)
+    })
+
+    it('recovers a bit of fatigue passively as time passes (Playtest 02)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fatigue: 50 })
+      store.advanceDays(10) // -1 de fadiga por dia
+      expect(store.stats.fatigue).toBe(40)
+    })
+
+    it('completion events report the applied effects (Playtest 02)', () => {
+      const store = freshGame()
+      store.startAction('play-show')
+      store.advanceToNextCompletion()
+      const msg = store.recentEvents[0]?.message ?? ''
+      expect(msg).toContain('fãs')
+      expect(msg).toContain('R$')
     })
   })
 

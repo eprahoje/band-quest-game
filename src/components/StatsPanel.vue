@@ -34,7 +34,7 @@ const statCards = computed(() => [
     label: 'Reputação',
     icon: IconStar,
     accent: 'var(--bq-stat-rep)',
-    formatted: `${store.stats.reputation}/100`,
+    formatted: formatFans(store.stats.reputation),
     warning: false,
   },
   {

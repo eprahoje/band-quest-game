@@ -19,10 +19,10 @@ describe('GameView', () => {
     return mount(GameView, { global: { plugins: [pinia] } })
   }
 
-  it('renders the band name and the daily calendar badge', () => {
+  it('renders the band name and the historical calendar badge (year 2000)', () => {
     const wrapper = render()
     expect(wrapper.text()).toContain('The Fuzz')
-    expect(wrapper.text()).toContain('Ano 1')
+    expect(wrapper.text()).toContain('2000')
     expect(wrapper.text()).toContain('Janeiro')
     expect(wrapper.text()).toContain('dia 1')
   })
@@ -37,7 +37,7 @@ describe('GameView', () => {
   it('shows the costs panel with the monthly member cost', () => {
     const wrapper = render()
     expect(wrapper.text()).toContain('Custos')
-    expect(wrapper.text()).toContain('R$ 440/mês') // 4 membros × 100 × 1.1
+    expect(wrapper.text()).toContain('R$ 400/mês') // 4 membros × 100 × (1 + 0/100)
   })
 
   it('starts an action when an effort button is clicked', async () => {
