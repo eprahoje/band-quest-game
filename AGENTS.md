@@ -20,10 +20,32 @@ This repository implements the Band Quest features documented in `../band-quest-
 
 Each feature should arrive here already refined enough to be implemented in small slices, with the documentation acting as the contract between planning and code.
 
-## Testing and validation
+## AI-DLC phases in this repo
 
-The agent must be able to attest to its own work without relying on the user
-opening files in a browser. Therefore:
+The canonical phase/gate model lives in
+`../band-quest-docs/docs/memory-bank/ai-dlc.md` — read it before starting a cycle.
+A feature only arrives here **after Inception's gate G1** (spec approved). This
+repo owns three of the four active phases:
+
+- **Implement** — code against the spec + `tokens.css`, with Vitest tests written
+  alongside the code. Exit gate **G2**: new behavior implemented and covered.
+- **Validate** — the "gate verde": `npm run test:unit`, `npm run type-check`,
+  `npm run lint`, build, plus a manual playtest (logged in
+  `../band-quest-docs/docs/playtests/`) when mechanics change. Exit gate **G3**.
+- **Deploy** (pre-alpha = **registrar o incremento**) — commit both repos and
+  update the memory bank, roadmap, playtest docs and the feature `log.md`. Exit
+  gate **G4**.
+
+Scale the ceremony to the change (see the scaling rule in `ai-dlc.md`): small
+fixes fast-track through Implement/Validate/Deploy in one cycle; mechanics,
+economy, progression or structural-UI changes go through every gate, recorded
+inline in the feature `log.md`. `Operate` is deferred until there is a published
+build.
+
+## Testing and validation (Validate phase, gate G3)
+
+This is the **Validate** phase. The agent must be able to attest to its own work
+without relying on the user opening files in a browser. Therefore:
 
 - **Code:** every code change ships with unit tests (Vitest). Vue components are
   tested with `@vue/test-utils` (logic + render). Run `npm run test:unit`,
