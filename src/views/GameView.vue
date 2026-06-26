@@ -122,6 +122,7 @@ const actionGroups = computed(() =>
     const cost = baseCash < 0 ? -baseCash : 0
     const reqs: string[] = []
     if (action.requires?.songs) reqs.push(`${action.requires.songs} música(s)`)
+    if (action.requires?.singles) reqs.push(`${action.requires.singles} single(s)`)
     if (action.requires?.reputation) reqs.push(`${action.requires.reputation} de reputação`)
     return { action, disabled: !check.ok, reason: check.reason, cost, reqs }
   }),

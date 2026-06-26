@@ -6,6 +6,8 @@
 // tempo avança pelas ações (ver store). Os NÚMEROS abaixo são placeholders de balance
 // (feature 0003) — serão calibrados numa iteração dedicada.
 
+import type { ReleaseType } from './releases'
+
 export type ActionLane = 'main' | 'background'
 
 // Categorias reaproveitam o EventCategory do store (feed de eventos).
@@ -26,6 +28,7 @@ export interface ActionEffortOption {
 
 export interface ActionRequirements {
   songs?: number // músicas prontas necessárias (consumidas ao iniciar)
+  singles?: number // singles já lançados necessários (absorvidos pelo álbum) — feature 0015
   reputation?: number // reputação mínima
 }
 
@@ -49,6 +52,8 @@ export interface ActionDef {
   effortOptions: ActionEffortOption[]
   requires?: ActionRequirements
   produces?: ActionProduction
+  // Lançamento gerado ao concluir (feature 0015): demo | single | album.
+  release?: ReleaseType
   outcome: ActionOutcome
   // Ações de recuperação (ex.: descansar) podem ser iniciadas mesmo com a banda
   // exausta — caso contrário a fadiga vira um soft-lock (playtest 2026-06-24, ponto 2).
@@ -83,9 +88,10 @@ export const ACTIONS: readonly ActionDef[] = [
     name: 'Gravar demo',
     lane: 'main',
     category: 'recording',
-    description: 'Grava uma demo caseira a partir de uma música.',
+    description: 'Junta 3 músicas numa demo caseira — degrau de início de carreira.',
     effortOptions: [{ label: 'Demo caseira', durationTurns: 3, costModifier: 1, outcomeModifier: 1 }],
-    requires: { songs: 1 },
+    requires: { songs: 3 },
+    release: 'demo',
     outcome: { metrics: { cash: -150, reputation: 1, fans: 25 }, variance: 0.2 },
   },
   {
@@ -93,12 +99,13 @@ export const ACTIONS: readonly ActionDef[] = [
     name: 'Gravar single',
     lane: 'main',
     category: 'recording',
-    description: 'Grava e lança um single.',
+    description: 'Grava e lança um single a partir de 1 música.',
     effortOptions: [
       { label: 'Single', durationTurns: 10, costModifier: 1, outcomeModifier: 1 },
       { label: 'Single caprichado', durationTurns: 16, costModifier: 1.6, outcomeModifier: 1.7 },
     ],
     requires: { songs: 1 },
+    release: 'single',
     outcome: { metrics: { cash: -400, reputation: 2, fans: 120 }, variance: 0.2 },
   },
   {
@@ -106,12 +113,13 @@ export const ACTIONS: readonly ActionDef[] = [
     name: 'Gravar álbum',
     lane: 'main',
     category: 'recording',
-    description: 'Grava um álbum completo a partir de várias músicas.',
+    description: 'Lança um álbum: exige 2 singles já lançados + 4 músicas novas.',
     effortOptions: [
       { label: 'Álbum', durationTurns: 35, costModifier: 1, outcomeModifier: 1 },
       { label: 'Álbum caprichado', durationTurns: 50, costModifier: 1.7, outcomeModifier: 1.8 },
     ],
-    requires: { songs: 3 },
+    requires: { singles: 2, songs: 4 },
+    release: 'album',
     outcome: { metrics: { cash: -1500, reputation: 6, fans: 600 }, variance: 0.25 },
   },
   {

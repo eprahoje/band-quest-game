@@ -217,11 +217,65 @@ describe('game store', () => {
       store.startAction('compose')
       store.advanceToNextCompletion()
       expect(store.availableSongs).toHaveLength(1)
-      const rec = store.startAction('record-demo') // requer 1 música
+      const rec = store.startAction('record-single') // requer 1 música
       expect(rec.ok).toBe(true)
       expect(store.availableSongs).toHaveLength(0) // não está mais disponível
       expect(store.songs).toHaveLength(1) // mas segue no inventário
       expect(store.songs[0]?.status).toBe('released')
+    })
+
+    // Helpers da cadeia de lançamento (feature 0015, slice 3).
+    function composeSongs(store: ReturnType<typeof freshGame>, n: number) {
+      for (let i = 0; i < n; i++) {
+        store.startAction('compose')
+        store.advanceToNextCompletion()
+      }
+    }
+    function recordSingle(store: ReturnType<typeof freshGame>) {
+      store.startAction('record-single')
+      store.advanceToNextCompletion()
+    }
+
+    it('record-single creates a single Release referencing the song (0015 slice 3)', () => {
+      const store = freshGame()
+      composeSongs(store, 1)
+      const songName = store.songs[0]!.name
+      recordSingle(store)
+      expect(store.releases).toHaveLength(1)
+      const single = store.releases[0]!
+      expect(single.type).toBe('single')
+      expect(single.title).toBe(songName) // single herda o nome da faixa
+      expect(single.trackIds).toEqual([store.songs[0]!.id])
+      expect(store.availableSingles).toHaveLength(1)
+    })
+
+    it('album requires 2 singles + 4 songs and absorbs the singles (0015 slice 3)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ cash: 100000 }) // isola o teste da economia (evita falência)
+      // sem singles nem músicas: bloqueado
+      expect(store.canStartAction('record-album').ok).toBe(false)
+
+      // dois singles (2 músicas compostas + gravadas)
+      composeSongs(store, 1)
+      recordSingle(store)
+      composeSongs(store, 1)
+      recordSingle(store)
+      expect(store.availableSingles).toHaveLength(2)
+
+      // ainda faltam as 4 músicas novas do álbum
+      expect(store.canStartAction('record-album').ok).toBe(false)
+      composeSongs(store, 4)
+      expect(store.canStartAction('record-album').ok).toBe(true)
+
+      store.startAction('record-album')
+      store.advanceToNextCompletion()
+
+      const album = store.releases.find((r) => r.type === 'album')!
+      expect(album).toBeDefined()
+      // 2 faixas dos singles + 4 músicas novas = 6
+      expect(album.trackIds).toHaveLength(6)
+      // os singles foram absorvidos → não mais disponíveis para outro álbum
+      expect(store.availableSingles).toHaveLength(0)
     })
 
     it('blocks recording when there are not enough songs', () => {

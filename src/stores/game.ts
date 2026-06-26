@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { createDefaultRoster, type BandMember } from '@/data/cast'
 import { getAction, resolveEffort, resolveOutcome, type ActionLane } from '@/data/actions'
 import { createSong, type Song } from '@/data/songs'
+import { createRelease, type Release } from '@/data/releases'
 import {
   computeScore,
   computeStars,
@@ -54,6 +55,9 @@ export interface ActiveAction {
   effortLabel: string
   turnsRemaining: number
   totalTurns: number
+  // Insumos reservados ao iniciar, para compor o lançamento ao concluir (feature 0015).
+  consumedSongIds?: string[]
+  consumedSingleIds?: string[]
 }
 
 const INITIAL_STATS: BandStats = {
@@ -129,17 +133,25 @@ export const useGameStore = defineStore('game', () => {
   const events = ref<GameEvent[]>([])
   // Inventário de músicas (feature 0015): substitui o antigo contador inteiro.
   const songs = ref<Song[]>([])
+  // Lançamentos: demo/single/álbum (feature 0015, slice 3).
+  const releases = ref<Release[]>([])
   const activeActions = ref<ActiveAction[]>([])
   // Dias desde a última atividade pública (para o decay de reputação).
   const inactiveDays = ref(0)
 
   let eventSeq = 0
   let songSeq = 0
+  let releaseSeq = 0
   // Fonte de aleatoriedade injetável (determinismo em testes).
   let randomFn: () => number = Math.random
 
   // Músicas ainda não lançadas — insumo das ações de gravação (feature 0015).
   const availableSongs = computed(() => songs.value.filter((s) => s.status === 'composed'))
+  // Singles ainda não absorvidos por um álbum — insumo do álbum (feature 0015, slice 3).
+  const availableSingles = computed(() =>
+    releases.value.filter((r) => r.type === 'single' && !r.consumedByAlbumId),
+  )
+  const songById = (id: string) => songs.value.find((s) => s.id === id)
 
   const isGameStarted = computed(() => currentView.value === 'game')
   const isFatigued = computed(() => stats.value.fatigue >= 80)
@@ -212,10 +224,12 @@ export const useGameStore = defineStore('game', () => {
     members.value = createDefaultRoster()
     events.value = []
     songs.value = []
+    releases.value = []
     activeActions.value = []
     inactiveDays.value = 0
     eventSeq = 0
     songSeq = 0
+    releaseSeq = 0
     turn.value = 1
     currentView.value = 'game'
     logEvent('milestone', `${payload.bandName} foi formada. Boa sorte!`)
@@ -279,6 +293,9 @@ export const useGameStore = defineStore('game', () => {
     if (req?.songs !== undefined && availableSongs.value.length < req.songs) {
       return { ok: false, reason: `Requer ${req.songs} música(s) pronta(s).` }
     }
+    if (req?.singles !== undefined && availableSingles.value.length < req.singles) {
+      return { ok: false, reason: `Requer ${req.singles} single(s) lançado(s).` }
+    }
     // effortLabel é validado por resolveEffort (cai na primeira opção se inválido).
     void effortLabel
     return { ok: true }
@@ -291,10 +308,21 @@ export const useGameStore = defineStore('game', () => {
     const action = getAction(actionId)
     const effort = resolveEffort(action, effortLabel)
 
-    // Consome pré-requisitos ao iniciar: marca as músicas mais antigas como lançadas
-    // (mantém o histórico no inventário — base p/ royalties/discografia, feature 0015).
+    // Reserva os insumos ao iniciar e guarda os ids para compor o lançamento ao concluir.
+    // As músicas viram `released` já no início (mantidas no inventário — base p/ royalties/
+    // discografia). Os singles só são marcados como absorvidos ao concluir o álbum.
+    const consumedSongIds: string[] = []
+    const consumedSingleIds: string[] = []
     if (action.requires?.songs) {
-      for (const s of availableSongs.value.slice(0, action.requires.songs)) s.status = 'released'
+      for (const s of availableSongs.value.slice(0, action.requires.songs)) {
+        s.status = 'released'
+        consumedSongIds.push(s.id)
+      }
+    }
+    if (action.requires?.singles) {
+      for (const r of availableSingles.value.slice(0, action.requires.singles)) {
+        consumedSingleIds.push(r.id)
+      }
     }
 
     activeActions.value.push({
@@ -305,6 +333,8 @@ export const useGameStore = defineStore('game', () => {
       effortLabel: effort.label,
       turnsRemaining: effort.durationTurns,
       totalTurns: effort.durationTurns,
+      ...(consumedSongIds.length ? { consumedSongIds } : {}),
+      ...(consumedSingleIds.length ? { consumedSingleIds } : {}),
     })
     return { ok: true }
   }
@@ -333,6 +363,37 @@ export const useGameStore = defineStore('game', () => {
         lastName = song.name
       }
       if (active.actionId === 'compose' && lastName) message = `"${lastName}" está pronta.`
+    }
+    // Cria o lançamento (demo/single/álbum) a partir dos insumos reservados (feature 0015).
+    if (action.release) {
+      const singlesAbsorbed = (active.consumedSingleIds ?? [])
+        .map((id) => releases.value.find((r) => r.id === id))
+        .filter((r): r is Release => r !== undefined)
+      const tracks: Song[] = []
+      // Faixas herdadas dos singles absorvidos (álbum) + músicas novas reservadas.
+      for (const single of singlesAbsorbed) {
+        for (const tid of single.trackIds) {
+          const s = songById(tid)
+          if (s) tracks.push(s)
+        }
+      }
+      for (const sid of active.consumedSongIds ?? []) {
+        const s = songById(sid)
+        if (s) tracks.push(s)
+      }
+      const release = createRelease({
+        id: String(++releaseSeq),
+        type: action.release,
+        releaseTurn: turn.value,
+        tracks,
+        rng: randomFn,
+      })
+      for (const single of singlesAbsorbed) single.consumedByAlbumId = release.id
+      releases.value.push(release)
+      message =
+        action.release === 'demo'
+          ? 'Demo gravada — os primeiros fãs a caminho.'
+          : `"${release.title}" foi lançado!`
     }
     // O evento reporta os efeitos aplicados como chips (Playtest 02, ponto 9).
     logEvent(active.category, message, effectsFromDeltas(deltas))
@@ -447,12 +508,14 @@ export const useGameStore = defineStore('game', () => {
     members.value = []
     events.value = []
     songs.value = []
+    releases.value = []
     activeActions.value = []
     inactiveDays.value = 0
     outcome.value = null
     negativeCashStreak = 0
     eventSeq = 0
     songSeq = 0
+    releaseSeq = 0
     turn.value = 0
     currentView.value = 'start'
   }
@@ -477,6 +540,8 @@ export const useGameStore = defineStore('game', () => {
     events,
     songs,
     availableSongs,
+    releases,
+    availableSingles,
     activeActions,
     isGameStarted,
     isFatigued,
