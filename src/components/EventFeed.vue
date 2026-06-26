@@ -8,7 +8,7 @@
 
     <ol v-else class="event-feed__list">
       <li
-        v-for="event in store.recentEvents"
+        v-for="event in visibleEvents"
         :key="event.id"
         class="event-item"
         :style="{ '--accent': categoryMeta[event.category].accent }"
@@ -34,11 +34,15 @@
         </div>
       </li>
     </ol>
+
+    <p v-if="hiddenCount > 0" class="event-feed__more">
+      + {{ hiddenCount }} acontecimento(s) anterior(es)
+    </p>
   </section>
 </template>
 
 <script setup lang="ts">
-import type { Component } from 'vue'
+import { computed, type Component } from 'vue'
 import {
   IconMicrophone2,
   IconDeviceSpeaker,
@@ -54,6 +58,12 @@ import { useGameStore } from '@/stores/game'
 import type { EventCategory } from '@/stores/game'
 
 const store = useGameStore()
+
+// Cap da timeline: renderiza só os mais recentes para não inflar a página
+// (Playtest 01, ponto 12). O histórico além disso fica indicado, não renderizado.
+const FEED_CAP = 40
+const visibleEvents = computed(() => store.recentEvents.slice(0, FEED_CAP))
+const hiddenCount = computed(() => Math.max(0, store.recentEvents.length - FEED_CAP))
 
 const categoryMeta: Record<EventCategory, { icon: Component; label: string; accent: string }> = {
   show: { icon: IconMicrophone2, label: 'Show', accent: 'var(--bq-stat-fans)' },
@@ -97,6 +107,16 @@ const categoryMeta: Record<EventCategory, { icon: Component; label: string; acce
   display: flex;
   flex-direction: column;
   gap: var(--bq-space-4);
+  /* Mantém a timeline com altura limitada e rolável (Playtest 01, ponto 12). */
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.event-feed__more {
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-faint);
+  font-family: var(--bq-font-mono);
+  padding-left: var(--bq-space-6);
 }
 
 .event-feed__list::before {

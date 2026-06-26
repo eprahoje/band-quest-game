@@ -14,8 +14,7 @@
       <button class="advance-btn" type="button" @click="advance">{{ advanceLabel }}</button>
     </section>
 
-    <section class="costs" aria-label="Custos da banda">
-      <h2 class="section-title">Custos</h2>
+    <CollapsibleSection title="Custos" aria-label="Custos da banda">
       <ul class="costs__list">
         <li class="costs__item">
           <span>Membros (mensal)</span>
@@ -30,17 +29,19 @@
           <span>em breve</span>
         </li>
       </ul>
-    </section>
+    </CollapsibleSection>
 
-    <section class="roster" aria-label="Membros da banda">
-      <h2 class="section-title">Banda</h2>
+    <CollapsibleSection title="Banda" aria-label="Membros da banda">
       <div class="roster__grid">
         <MemberCard v-for="m in store.members" :key="m.memberId" :member="m" />
       </div>
-    </section>
+    </CollapsibleSection>
 
-    <section class="in-progress" aria-label="Ações em andamento">
-      <h2 class="section-title">Em andamento</h2>
+    <CollapsibleSection
+      title="Em andamento"
+      aria-label="Ações em andamento"
+      :hint="store.activeActions.length ? `${store.activeActions.length} ativa(s)` : ''"
+    >
       <p v-if="store.activeActions.length === 0" class="in-progress__empty">
         Nada em andamento. Escolha uma ação para o tempo avançar.
       </p>
@@ -53,10 +54,9 @@
           </span>
         </li>
       </ul>
-    </section>
+    </CollapsibleSection>
 
-    <section class="actions" aria-label="Ações disponíveis">
-      <h2 class="section-title">Ações</h2>
+    <CollapsibleSection title="Ações" aria-label="Ações disponíveis">
       <div class="actions__grid">
         <article
           v-for="group in actionGroups"
@@ -88,7 +88,7 @@
           </div>
         </article>
       </div>
-    </section>
+    </CollapsibleSection>
 
     <EventFeed />
   </main>
@@ -100,6 +100,7 @@ import { useRouter } from 'vue-router'
 import StatsPanel from '@/components/StatsPanel.vue'
 import EventFeed from '@/components/EventFeed.vue'
 import MemberCard from '@/components/MemberCard.vue'
+import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
 import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'
 
