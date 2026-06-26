@@ -116,6 +116,32 @@ export interface StartActionResult {
   reason?: string
 }
 
+export interface CalendarDate {
+  year: number
+  month: number
+  monthName: string
+  day: number
+  displayYear: number
+}
+
+// Converte um turno (dia) em data de calendário. Antes de começar (turn < 1): ano 1, dia 0.
+export function computeCalendar(turn: number): CalendarDate {
+  if (turn < 1) {
+    return { year: 1, month: 1, monthName: MONTH_NAMES[0], day: 0, displayYear: START_YEAR }
+  }
+  const zero = turn - 1
+  const dayOfYear = zero % DAYS_PER_YEAR
+  const month = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1
+  const year = Math.floor(zero / DAYS_PER_YEAR) + 1
+  return {
+    year,
+    month,
+    monthName: MONTH_NAMES[month - 1] ?? MONTH_NAMES[0],
+    day: (dayOfYear % DAYS_PER_MONTH) + 1,
+    displayYear: START_YEAR + year - 1,
+  }
+}
+
 export const useGameStore = defineStore('game', () => {
   const bandName = ref('')
   const genre = ref('')
@@ -159,23 +185,10 @@ export const useGameStore = defineStore('game', () => {
   // Eventos mais recentes primeiro, para renderização direta na timeline.
   const recentEvents = computed(() => [...events.value].reverse())
 
-  // Calendário derivado do turno (dia). Antes de começar: ano 1, dia 0.
-  const calendar = computed(() => {
-    if (turn.value < 1) {
-      return { year: 1, month: 1, monthName: MONTH_NAMES[0], day: 0, displayYear: START_YEAR }
-    }
-    const zero = turn.value - 1
-    const dayOfYear = zero % DAYS_PER_YEAR
-    const month = Math.floor(dayOfYear / DAYS_PER_MONTH) + 1
-    const year = Math.floor(zero / DAYS_PER_YEAR) + 1
-    return {
-      year,
-      month,
-      monthName: MONTH_NAMES[month - 1] ?? MONTH_NAMES[0],
-      day: (dayOfYear % DAYS_PER_MONTH) + 1,
-      displayYear: START_YEAR + year - 1,
-    }
-  })
+  // Calendário derivado do turno atual (dia).
+  const calendar = computed(() => computeCalendar(turn.value))
+  // Data de calendário de um turno arbitrário (ex.: data de um lançamento — feature 0015).
+  const calendarAt = (t: number) => computeCalendar(t)
 
   const activeMainAction = computed(
     () => activeActions.value.find((a) => a.lane === 'main') ?? null,
@@ -547,6 +560,7 @@ export const useGameStore = defineStore('game', () => {
     isFatigued,
     recentEvents,
     calendar,
+    calendarAt,
     activeMainAction,
     canStartMain,
     nextCompletionDays,
