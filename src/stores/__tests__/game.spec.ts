@@ -448,6 +448,82 @@ describe('game store', () => {
     })
   })
 
+  describe('royalties (feature 0015, slice 4 / D4)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+    function composeSongs(store: ReturnType<typeof freshGame>, n: number) {
+      for (let i = 0; i < n; i++) {
+        store.startAction('compose')
+        store.advanceToNextCompletion()
+      }
+    }
+    function releaseSingle(store: ReturnType<typeof freshGame>) {
+      composeSongs(store, 1)
+      store.startAction('record-single')
+      store.advanceToNextCompletion()
+      return store.releases.find((r) => r.type === 'single')!
+    }
+
+    it('a released single seeds a positive per-turn royalty scaled by fans', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fans: 300 })
+      const single = releaseSingle(store)
+      expect(single.currentRoyalty).toBeGreaterThan(0)
+      expect(single.fanBaseAtRelease).toBeGreaterThanOrEqual(300)
+      expect(single.totalRoyaltiesEarned).toBe(0)
+      expect(store.royaltyIncomePerTurn).toBe(Math.round(single.currentRoyalty))
+    })
+
+    it('accrues royalties into cash over time and decays the per-turn royalty', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fans: 1000 })
+      const single = releaseSingle(store)
+      single.currentRoyalty = 100 // controla o valor para previsibilidade
+      const cashBefore = store.stats.cash
+      store.advanceDays(1) // paga 100 (decay single 0.96 → próximo 96)
+      expect(store.stats.cash).toBe(cashBefore + 100)
+      expect(store.royaltiesEarnedTotal).toBe(100)
+      expect(single.currentRoyalty).toBeCloseTo(96)
+      expect(single.totalRoyaltiesEarned).toBeCloseTo(100)
+    })
+
+    it('demo earns no royalty (career step, not income)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fans: 500 })
+      composeSongs(store, 3)
+      store.startAction('record-demo')
+      store.advanceToNextCompletion()
+      const demo = store.releases.find((r) => r.type === 'demo')!
+      expect(demo.currentRoyalty).toBe(0)
+    })
+
+    it('reports the accumulated royalties as a monthly event', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fans: 2000 })
+      const single = releaseSingle(store)
+      single.currentRoyalty = 100
+      store.advanceDays(60) // cruza ao menos uma virada de mês
+      const ev = store.recentEvents.find((e) => e.message === 'Royalties recebidos.')
+      expect(ev).toBeDefined()
+      expect(ev!.effects?.[0]?.tone).toBe('pos')
+    })
+
+    it('resetGame clears the royalty total', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fans: 1000 })
+      const single = releaseSingle(store)
+      single.currentRoyalty = 50
+      store.advanceDays(1)
+      expect(store.royaltiesEarnedTotal).toBeGreaterThan(0)
+      store.resetGame()
+      expect(store.royaltiesEarnedTotal).toBe(0)
+    })
+  })
+
   describe('session modes & outcomes (0010)', () => {
     function freshGame(durationYears = 10) {
       const store = useGameStore()

@@ -10,7 +10,17 @@ const songs: Song[] = [
   { id: '2', name: 'Nova Noite', genre: 'Rock', theme: 'Noite', quality: 55, status: 'composed' },
 ]
 const releases: Release[] = [
-  { id: 'r1', type: 'single', title: 'Última Estrada', releaseTurn: 40, trackIds: ['1'], quality: 72 },
+  {
+    id: 'r1',
+    type: 'single',
+    title: 'Última Estrada',
+    releaseTurn: 40,
+    trackIds: ['1'],
+    quality: 72,
+    fanBaseAtRelease: 120,
+    currentRoyalty: 8,
+    totalRoyaltiesEarned: 64,
+  },
 ]
 
 function editSong(id: string, patch: { name?: string; genre?: string; theme?: string }) {
@@ -52,6 +62,11 @@ describe('SongLibrary (feature 0015, slice 5)', () => {
     const c = computeCalendar(40)
     expect(wrapper.text()).toContain(`${c.displayYear} · ${c.monthName}, dia ${c.day}`)
     expect(wrapper.text()).toContain('1 faixa(s)')
+  })
+
+  it('shows the current royalty per release (D4)', () => {
+    const wrapper = mount(SongLibrary)
+    expect(wrapper.text()).toContain('R$ 8/dia')
   })
 
   it('shows the count hint per section', () => {

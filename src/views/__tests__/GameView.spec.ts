@@ -40,6 +40,13 @@ describe('GameView', () => {
     expect(wrapper.text()).toContain('R$ 400/mês') // 4 membros × 100 × (1 + 0/100)
   })
 
+  it('shows the earnings panel with the royalty income (0015 slice 4)', () => {
+    const wrapper = render()
+    expect(wrapper.text()).toContain('Ganhos')
+    expect(wrapper.text()).toContain('Royalties (por dia)')
+    expect(wrapper.text()).toContain('Royalties recebidos (total)')
+  })
+
   it('starts an action when an effort button is clicked', async () => {
     const wrapper = render()
     const store = useGameStore()

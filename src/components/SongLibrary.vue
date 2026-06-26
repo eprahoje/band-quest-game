@@ -51,6 +51,7 @@
           <template v-else>
             <span class="lib-row__name">{{ r.title }}</span>
             <span class="lib-row__meta">{{ dateLabel(r.releaseTurn) }} · {{ r.trackIds.length }} faixa(s)</span>
+            <span class="lib-row__royalty">{{ royaltyLabel(r) }}</span>
             <span class="lib-row__quality">Q {{ r.quality }}</span>
             <button class="lib-edit" type="button" aria-label="Renomear lançamento" @click="startEditRelease(r)">
               ✎
@@ -85,6 +86,12 @@ const RELEASE_TYPE_LABEL: Record<ReleaseType, string> = {
 function dateLabel(turn: number): string {
   const c = store.calendarAt(turn)
   return `${c.displayYear} · ${c.monthName}, dia ${c.day}`
+}
+
+// Royalty atual do lançamento (D4): R$/dia enquanto ativo; "—" quando expirado/sem renda.
+function royaltyLabel(r: Release): string {
+  const royalty = Math.round(r.currentRoyalty ?? 0)
+  return royalty > 0 ? `R$ ${royalty}/dia` : '—'
 }
 
 // Edição inline de metadado (feature 0015, D7).
@@ -165,11 +172,24 @@ function cancelEdit() {
 }
 
 .lib-row__quality {
-  margin-left: auto;
   flex-shrink: 0;
   font-family: var(--bq-font-mono);
   font-size: var(--bq-text-xs);
   color: var(--bq-spotlight);
+}
+
+/* Músicas (sem royalty): a qualidade é o 1º item à direita e empurra o resto. */
+.lib-row__meta + .lib-row__quality {
+  margin-left: auto;
+}
+
+/* Royalty atual (D4) — empurra qualidade/edição para a direita. */
+.lib-row__royalty {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--bq-font-mono);
+  font-size: var(--bq-text-xs);
+  color: var(--bq-positive);
 }
 
 /* Chip de status/tipo — espelha o .tag do design-system. */

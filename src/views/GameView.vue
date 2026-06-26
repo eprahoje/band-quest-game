@@ -82,6 +82,27 @@
       </ul>
     </CollapsibleSection>
 
+    <CollapsibleSection
+      title="Ganhos"
+      aria-label="Ganhos da banda"
+      :hint="store.royaltyIncomePerTurn ? `R$ ${store.royaltyIncomePerTurn}/dia` : ''"
+    >
+      <ul class="costs__list">
+        <li class="costs__item">
+          <span>Royalties (por dia)</span>
+          <strong class="costs__pos">R$ {{ store.royaltyIncomePerTurn }}/dia</strong>
+        </li>
+        <li class="costs__item">
+          <span>Royalties recebidos (total)</span>
+          <strong class="costs__pos">R$ {{ store.royaltiesEarnedTotal }}</strong>
+        </li>
+        <li class="costs__item costs__item--muted">
+          <span>Cachês de show, vendas</span>
+          <span>ver cartões abaixo</span>
+        </li>
+      </ul>
+    </CollapsibleSection>
+
     <CollapsibleSection title="Banda" aria-label="Membros da banda">
       <div class="roster__grid">
         <MemberCard v-for="m in store.members" :key="m.memberId" :member="m" />
@@ -437,6 +458,10 @@ function advance() {
 .costs__item--muted {
   color: var(--bq-text-faint);
   font-size: var(--bq-text-xs);
+}
+
+.costs__pos {
+  color: var(--bq-positive);
 }
 
 .action-card__meta {

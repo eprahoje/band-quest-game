@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { createDefaultRoster, type BandMember } from '@/data/cast'
 import { getAction, resolveEffort, resolveOutcome, type ActionLane } from '@/data/actions'
 import { createSong, type Song } from '@/data/songs'
-import { createRelease, type Release } from '@/data/releases'
+import { createRelease, accrueRoyalty, ROYALTY_PROFILE, type Release } from '@/data/releases'
 import {
   computeScore,
   computeStars,
@@ -170,10 +170,16 @@ export const useGameStore = defineStore('game', () => {
   const activeActions = ref<ActiveAction[]>([])
   // Dias desde a última atividade pública (para o decay de reputação).
   const inactiveDays = ref(0)
+  // Total de royalties recebidos na sessão (receita de longo prazo — slice 4 / D4).
+  const royaltiesEarnedTotal = ref(0)
 
   let eventSeq = 0
   let songSeq = 0
   let releaseSeq = 0
+  // Resíduo fracionário de royalty: mantém o caixa inteiro creditando só a parte inteira.
+  let royaltyResidual = 0
+  // Royalty acumulado desde o último relatório mensal (creditado no caixa; flush no evento).
+  let pendingRoyalty = 0
   // Fonte de aleatoriedade injetável (determinismo em testes).
   let randomFn: () => number = Math.random
 
@@ -225,6 +231,11 @@ export const useGameStore = defineStore('game', () => {
     Math.round(members.value.length * MEMBER_BASE_MONTHLY_COST * (1 + stats.value.reputation / 100)),
   )
 
+  // Royalty pago no próximo turno (soma dos lançamentos ativos) — receita por dia (D4).
+  const royaltyIncomePerTurn = computed(() =>
+    Math.round(releases.value.reduce((sum, r) => sum + (r.currentRoyalty ?? 0), 0)),
+  )
+
   function startGame(payload: {
     bandName: string
     genre: string
@@ -246,9 +257,12 @@ export const useGameStore = defineStore('game', () => {
     releases.value = []
     activeActions.value = []
     inactiveDays.value = 0
+    royaltiesEarnedTotal.value = 0
     eventSeq = 0
     songSeq = 0
     releaseSeq = 0
+    royaltyResidual = 0
+    pendingRoyalty = 0
     turn.value = 1
     currentView.value = 'game'
     logEvent('milestone', `${payload.bandName} foi formada. Boa sorte!`)
@@ -434,6 +448,7 @@ export const useGameStore = defineStore('game', () => {
         type: action.release,
         releaseTurn: turn.value,
         tracks,
+        fanBase: stats.value.fans,
         rng: randomFn,
       })
       for (const single of singlesAbsorbed) single.consumedByAlbumId = release.id
@@ -466,11 +481,14 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // Quantas viradas de mês há entre dois turnos (dias).
+  function monthsCrossed(oldTurn: number, newTurn: number): number {
+    return Math.floor((newTurn - 1) / DAYS_PER_MONTH) - Math.floor((oldTurn - 1) / DAYS_PER_MONTH)
+  }
+
   // Cobra os custos mensais (membros) por cada virada de mês cruzada no avanço.
   function chargeMonthlyCosts(oldTurn: number, newTurn: number) {
-    const monthsCrossed =
-      Math.floor((newTurn - 1) / DAYS_PER_MONTH) - Math.floor((oldTurn - 1) / DAYS_PER_MONTH)
-    for (let i = 0; i < monthsCrossed; i++) {
+    for (let i = 0; i < monthsCrossed(oldTurn, newTurn); i++) {
       const cost = monthlyMemberCost.value
       if (cost > 0) {
         applyStatDelta({ cash: -cost })
@@ -478,6 +496,36 @@ export const useGameStore = defineStore('game', () => {
           { label: `-R$ ${cost}`, tone: 'neg' },
         ])
       }
+    }
+  }
+
+  // Acumula os royalties de `days` turnos: cada lançamento ativo paga e decai (D4). O caixa
+  // recebe só a parte inteira (o resíduo fracionário se acumula). Sem evento por turno — o
+  // total é reportado uma vez por mês (flushRoyalties) para não inflar a timeline.
+  function accrueRoyalties(days: number) {
+    let revenue = 0
+    for (const r of releases.value) {
+      if (!r.currentRoyalty || r.currentRoyalty <= 0) continue
+      const { revenue: rev, next } = accrueRoyalty(r.currentRoyalty, ROYALTY_PROFILE[r.type].decay, days)
+      r.currentRoyalty = next
+      r.totalRoyaltiesEarned += rev
+      revenue += rev
+    }
+    if (revenue <= 0) return
+    royaltyResidual += revenue
+    const whole = Math.floor(royaltyResidual)
+    if (whole <= 0) return
+    royaltyResidual -= whole
+    applyStatDelta({ cash: whole })
+    royaltiesEarnedTotal.value += whole
+    pendingRoyalty += whole
+  }
+
+  // Reporta os royalties acumulados como um único evento na virada de mês (par com os custos).
+  function flushRoyalties(oldTurn: number, newTurn: number) {
+    if (monthsCrossed(oldTurn, newTurn) > 0 && pendingRoyalty > 0) {
+      logEvent('negotiation', 'Royalties recebidos.', [{ label: `+R$ ${pendingRoyalty}`, tone: 'pos' }])
+      pendingRoyalty = 0
     }
   }
 
@@ -521,7 +569,9 @@ export const useGameStore = defineStore('game', () => {
     const oldTurn = turn.value
     turn.value += days
 
+    accrueRoyalties(days)
     chargeMonthlyCosts(oldTurn, turn.value)
+    flushRoyalties(oldTurn, turn.value)
     applyReputationDecay(days)
     // Recuperação passiva de energia ao passar o tempo (Playtest 02, ponto 8).
     applyStatDelta({ fatigue: -days * PASSIVE_FATIGUE_RECOVERY_PER_DAY })
@@ -559,11 +609,14 @@ export const useGameStore = defineStore('game', () => {
     releases.value = []
     activeActions.value = []
     inactiveDays.value = 0
+    royaltiesEarnedTotal.value = 0
     outcome.value = null
     negativeCashStreak = 0
     eventSeq = 0
     songSeq = 0
     releaseSeq = 0
+    royaltyResidual = 0
+    pendingRoyalty = 0
     turn.value = 0
     currentView.value = 'start'
   }
@@ -616,6 +669,8 @@ export const useGameStore = defineStore('game', () => {
     bandQuality,
     qualityModifier,
     monthlyMemberCost,
+    royaltyIncomePerTurn,
+    royaltiesEarnedTotal,
     inactiveDays,
     startGame,
     applyStatDelta,
