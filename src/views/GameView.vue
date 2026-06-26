@@ -10,7 +10,7 @@
     <StatsPanel />
 
     <section class="loop-bar" aria-label="Calendário">
-      <span class="loop-bar__songs">Músicas prontas: <strong>{{ store.songs }}</strong></span>
+      <span class="loop-bar__songs">Músicas prontas: <strong>{{ store.availableSongs.length }}</strong></span>
       <button class="advance-btn" type="button" @click="advance">{{ advanceLabel }}</button>
     </section>
 

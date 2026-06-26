@@ -190,21 +190,38 @@ describe('game store', () => {
       store.startAction('compose') // duração em dias, produz 1 música
       store.advanceDays(1)
       expect(store.activeActions).toHaveLength(1)
-      expect(store.songs).toBe(0)
+      expect(store.availableSongs).toHaveLength(0)
       store.advanceToNextCompletion() // salta o restante até concluir
       expect(store.activeActions).toHaveLength(0)
-      expect(store.songs).toBe(1)
+      expect(store.availableSongs).toHaveLength(1)
     })
 
-    it('consumes a song when starting a recording that requires it', () => {
-      const store = freshGame()
-      // produz uma música via compose
+    it('compose creates a first-class Song with inherited genre and quality (0015)', () => {
+      const store = freshGame() // genre 'Rock'
       store.startAction('compose')
       store.advanceToNextCompletion()
-      expect(store.songs).toBe(1)
+      const song = store.songs[0]
+      expect(song).toBeDefined()
+      expect(song!.name.length).toBeGreaterThan(0)
+      expect(song!.theme.length).toBeGreaterThan(0)
+      expect(song!.genre).toBe('Rock')
+      expect(song!.quality).toBeGreaterThanOrEqual(1)
+      expect(song!.quality).toBeLessThanOrEqual(100)
+      expect(song!.status).toBe('composed')
+      // a mensagem do evento nomeia a música
+      expect(store.recentEvents[0]?.message).toContain(song!.name)
+    })
+
+    it('recording marks the song as released (kept in inventory) (0015)', () => {
+      const store = freshGame()
+      store.startAction('compose')
+      store.advanceToNextCompletion()
+      expect(store.availableSongs).toHaveLength(1)
       const rec = store.startAction('record-demo') // requer 1 música
       expect(rec.ok).toBe(true)
-      expect(store.songs).toBe(0)
+      expect(store.availableSongs).toHaveLength(0) // não está mais disponível
+      expect(store.songs).toHaveLength(1) // mas segue no inventário
+      expect(store.songs[0]?.status).toBe('released')
     })
 
     it('blocks recording when there are not enough songs', () => {
@@ -251,7 +268,7 @@ describe('game store', () => {
       store.startAction('play-show')
       store.startGame({ bandName: 'C', genre: 'Pop', originTrait: 'Garagem' })
       expect(store.activeActions).toHaveLength(0)
-      expect(store.songs).toBe(0)
+      expect(store.songs).toHaveLength(0)
     })
   })
 

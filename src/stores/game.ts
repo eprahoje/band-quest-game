@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { createDefaultRoster, type BandMember } from '@/data/cast'
 import { getAction, resolveEffort, resolveOutcome, type ActionLane } from '@/data/actions'
+import { createSong, type Song } from '@/data/songs'
 import {
   computeScore,
   computeStars,
@@ -126,14 +127,19 @@ export const useGameStore = defineStore('game', () => {
   const stats = ref<BandStats>({ ...INITIAL_STATS })
   const members = ref<BandMember[]>([])
   const events = ref<GameEvent[]>([])
-  const songs = ref(0)
+  // Inventário de músicas (feature 0015): substitui o antigo contador inteiro.
+  const songs = ref<Song[]>([])
   const activeActions = ref<ActiveAction[]>([])
   // Dias desde a última atividade pública (para o decay de reputação).
   const inactiveDays = ref(0)
 
   let eventSeq = 0
+  let songSeq = 0
   // Fonte de aleatoriedade injetável (determinismo em testes).
   let randomFn: () => number = Math.random
+
+  // Músicas ainda não lançadas — insumo das ações de gravação (feature 0015).
+  const availableSongs = computed(() => songs.value.filter((s) => s.status === 'composed'))
 
   const isGameStarted = computed(() => currentView.value === 'game')
   const isFatigued = computed(() => stats.value.fatigue >= 80)
@@ -205,10 +211,11 @@ export const useGameStore = defineStore('game', () => {
     stats.value = { ...INITIAL_STATS }
     members.value = createDefaultRoster()
     events.value = []
-    songs.value = 0
+    songs.value = []
     activeActions.value = []
     inactiveDays.value = 0
     eventSeq = 0
+    songSeq = 0
     turn.value = 1
     currentView.value = 'game'
     logEvent('milestone', `${payload.bandName} foi formada. Boa sorte!`)
@@ -269,7 +276,7 @@ export const useGameStore = defineStore('game', () => {
     if (req?.reputation !== undefined && stats.value.reputation < req.reputation) {
       return { ok: false, reason: `Requer ${req.reputation} de reputação.` }
     }
-    if (req?.songs !== undefined && songs.value < req.songs) {
+    if (req?.songs !== undefined && availableSongs.value.length < req.songs) {
       return { ok: false, reason: `Requer ${req.songs} música(s) pronta(s).` }
     }
     // effortLabel é validado por resolveEffort (cai na primeira opção se inválido).
@@ -284,8 +291,11 @@ export const useGameStore = defineStore('game', () => {
     const action = getAction(actionId)
     const effort = resolveEffort(action, effortLabel)
 
-    // Consome pré-requisitos ao iniciar.
-    if (action.requires?.songs) songs.value -= action.requires.songs
+    // Consome pré-requisitos ao iniciar: marca as músicas mais antigas como lançadas
+    // (mantém o histórico no inventário — base p/ royalties/discografia, feature 0015).
+    if (action.requires?.songs) {
+      for (const s of availableSongs.value.slice(0, action.requires.songs)) s.status = 'released'
+    }
 
     activeActions.value.push({
       actionId: action.id,
@@ -307,9 +317,25 @@ export const useGameStore = defineStore('game', () => {
       qualityModifier: qualityModifier.value,
     })
     applyStatDelta(deltas as Partial<BandStats>)
-    if (action.produces?.songs) songs.value += action.produces.songs
+    // Cria as músicas produzidas com metadado autogerado e qualidade (feature 0015).
+    let message = completionMessage(active)
+    if (action.produces?.songs) {
+      let lastName = ''
+      for (let i = 0; i < action.produces.songs; i++) {
+        const song = createSong({
+          id: String(++songSeq),
+          genre: genre.value,
+          bandQuality: bandQuality.value,
+          effortModifier: effort.outcomeModifier,
+          rng: randomFn,
+        })
+        songs.value.push(song)
+        lastName = song.name
+      }
+      if (active.actionId === 'compose' && lastName) message = `"${lastName}" está pronta.`
+    }
     // O evento reporta os efeitos aplicados como chips (Playtest 02, ponto 9).
-    logEvent(active.category, completionMessage(active), effectsFromDeltas(deltas))
+    logEvent(active.category, message, effectsFromDeltas(deltas))
   }
 
   function completionMessage(active: ActiveAction): string {
@@ -420,12 +446,13 @@ export const useGameStore = defineStore('game', () => {
     stats.value = { ...INITIAL_STATS }
     members.value = []
     events.value = []
-    songs.value = 0
+    songs.value = []
     activeActions.value = []
     inactiveDays.value = 0
     outcome.value = null
     negativeCashStreak = 0
     eventSeq = 0
+    songSeq = 0
     turn.value = 0
     currentView.value = 'start'
   }
@@ -449,6 +476,7 @@ export const useGameStore = defineStore('game', () => {
     members,
     events,
     songs,
+    availableSongs,
     activeActions,
     isGameStarted,
     isFatigued,
