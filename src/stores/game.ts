@@ -116,6 +116,12 @@ export interface StartActionResult {
   reason?: string
 }
 
+// Seleção explícita de insumos ao gravar (feature 0015, D6). Sem ela, auto-pick.
+export interface ActionSelection {
+  songIds?: string[]
+  singleIds?: string[]
+}
+
 export interface CalendarDate {
   year: number
   month: number
@@ -314,29 +320,58 @@ export const useGameStore = defineStore('game', () => {
     return { ok: true }
   }
 
-  function startAction(actionId: string, effortLabel?: string): StartActionResult {
+  function startAction(
+    actionId: string,
+    effortLabel?: string,
+    selection?: ActionSelection,
+  ): StartActionResult {
     const check = canStartAction(actionId, effortLabel)
     if (!check.ok) return check
 
     const action = getAction(actionId)
     const effort = resolveEffort(action, effortLabel)
 
+    // Resolve as faixas/singles a consumir: por seleção explícita do jogador (D6) ou,
+    // na ausência dela, auto-pick das mais antigas (compatibilidade).
+    let songsToConsume: Song[] = []
+    if (action.requires?.songs) {
+      if (selection?.songIds) {
+        const picked = selection.songIds
+          .map((id) => availableSongs.value.find((s) => s.id === id))
+          .filter((s): s is Song => s !== undefined)
+        if (picked.length !== action.requires.songs) {
+          return { ok: false, reason: `Selecione ${action.requires.songs} música(s) válida(s).` }
+        }
+        songsToConsume = picked
+      } else {
+        songsToConsume = availableSongs.value.slice(0, action.requires.songs)
+      }
+    }
+    let singlesToConsume: Release[] = []
+    if (action.requires?.singles) {
+      if (selection?.singleIds) {
+        const picked = selection.singleIds
+          .map((id) => availableSingles.value.find((r) => r.id === id))
+          .filter((r): r is Release => r !== undefined)
+        if (picked.length !== action.requires.singles) {
+          return { ok: false, reason: `Selecione ${action.requires.singles} single(s) válido(s).` }
+        }
+        singlesToConsume = picked
+      } else {
+        singlesToConsume = availableSingles.value.slice(0, action.requires.singles)
+      }
+    }
+
     // Reserva os insumos ao iniciar e guarda os ids para compor o lançamento ao concluir.
     // As músicas viram `released` já no início (mantidas no inventário — base p/ royalties/
     // discografia). Os singles só são marcados como absorvidos ao concluir o álbum.
     const consumedSongIds: string[] = []
     const consumedSingleIds: string[] = []
-    if (action.requires?.songs) {
-      for (const s of availableSongs.value.slice(0, action.requires.songs)) {
-        s.status = 'released'
-        consumedSongIds.push(s.id)
-      }
+    for (const s of songsToConsume) {
+      s.status = 'released'
+      consumedSongIds.push(s.id)
     }
-    if (action.requires?.singles) {
-      for (const r of availableSingles.value.slice(0, action.requires.singles)) {
-        consumedSingleIds.push(r.id)
-      }
-    }
+    for (const r of singlesToConsume) consumedSingleIds.push(r.id)
 
     activeActions.value.push({
       actionId: action.id,
@@ -533,6 +568,20 @@ export const useGameStore = defineStore('game', () => {
     currentView.value = 'start'
   }
 
+  // Edição de metadado (feature 0015, D7). Campos vazios/ausentes são ignorados.
+  function editSong(id: string, patch: { name?: string; genre?: string; theme?: string }) {
+    const song = songById(id)
+    if (!song) return
+    if (patch.name !== undefined && patch.name.trim()) song.name = patch.name.trim()
+    if (patch.genre !== undefined && patch.genre.trim()) song.genre = patch.genre.trim()
+    if (patch.theme !== undefined && patch.theme.trim()) song.theme = patch.theme.trim()
+  }
+
+  function renameRelease(id: string, title: string) {
+    const release = releases.value.find((r) => r.id === id)
+    if (release && title.trim()) release.title = title.trim()
+  }
+
   // Seam de teste: injeta uma fonte de aleatoriedade determinística.
   function setRandomSource(fn: () => number) {
     randomFn = fn
@@ -573,6 +622,8 @@ export const useGameStore = defineStore('game', () => {
     logEvent,
     canStartAction,
     startAction,
+    editSong,
+    renameRelease,
     advanceDays,
     advanceToNextCompletion,
     resetGame,

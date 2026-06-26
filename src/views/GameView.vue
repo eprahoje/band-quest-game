@@ -9,9 +9,60 @@
 
     <StatsPanel />
 
-    <section class="loop-bar" aria-label="Calendário">
-      <span class="loop-bar__songs">Músicas prontas: <strong>{{ store.availableSongs.length }}</strong></span>
+    <section class="loop-bar" aria-label="Avançar o tempo">
+      <span class="loop-bar__hint">O tempo avança pelas ações.</span>
       <button class="advance-btn" type="button" @click="advance">{{ advanceLabel }}</button>
+    </section>
+
+    <section v-if="selecting" class="track-picker" aria-label="Selecionar faixas">
+      <header class="track-picker__head">
+        <strong>{{ selecting.action.name }} · {{ selecting.effort.label }}</strong>
+        <button class="track-picker__close" type="button" @click="cancelSelection">✕</button>
+      </header>
+      <p class="track-picker__hint">
+        Escolha {{ requiredSongs }} música(s){{ requiredSingles ? ` e ${requiredSingles} single(s)` : '' }}.
+      </p>
+
+      <ul v-if="requiredSongs" class="picker-list">
+        <li v-for="s in store.availableSongs" :key="s.id">
+          <label class="picker-row">
+            <input
+              type="checkbox"
+              :checked="selecting.songIds.includes(s.id)"
+              :disabled="!selecting.songIds.includes(s.id) && selecting.songIds.length >= requiredSongs"
+              @change="toggleSong(s.id)"
+            />
+            <span class="picker-row__name">{{ s.name }}</span>
+            <span class="picker-row__meta">{{ s.genre }} · {{ s.theme }}</span>
+            <span class="picker-row__q">Q {{ s.quality }}</span>
+          </label>
+        </li>
+      </ul>
+
+      <template v-if="requiredSingles">
+        <p class="track-picker__sub">Singles a incluir no álbum:</p>
+        <ul class="picker-list">
+          <li v-for="r in store.availableSingles" :key="r.id">
+            <label class="picker-row">
+              <input
+                type="checkbox"
+                :checked="selecting.singleIds.includes(r.id)"
+                :disabled="!selecting.singleIds.includes(r.id) && selecting.singleIds.length >= requiredSingles"
+                @change="toggleSingle(r.id)"
+              />
+              <span class="picker-row__name">{{ r.title }}</span>
+              <span class="picker-row__q">Q {{ r.quality }}</span>
+            </label>
+          </li>
+        </ul>
+      </template>
+
+      <div class="track-picker__actions">
+        <button class="picker-cancel" type="button" @click="cancelSelection">Cancelar</button>
+        <button class="advance-btn" type="button" :disabled="!selectionComplete" @click="confirmSelection">
+          Confirmar e gravar
+        </button>
+      </div>
     </section>
 
     <CollapsibleSection title="Custos" aria-label="Custos da banda">
@@ -97,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import StatsPanel from '@/components/StatsPanel.vue'
 import EventFeed from '@/components/EventFeed.vue'
@@ -137,8 +188,60 @@ const advanceLabel = computed(() => {
   return `Avançar ${days} ${days === 1 ? 'dia' : 'dias'} ›`
 })
 
+// Seleção de faixas ao gravar (feature 0015, D6).
+interface Selecting {
+  action: ActionDef
+  effort: ActionEffortOption
+  songIds: string[]
+  singleIds: string[]
+}
+const selecting = ref<Selecting | null>(null)
+const requiredSongs = computed(() => selecting.value?.action.requires?.songs ?? 0)
+const requiredSingles = computed(() => selecting.value?.action.requires?.singles ?? 0)
+const selectionComplete = computed(
+  () =>
+    !!selecting.value &&
+    selecting.value.songIds.length === requiredSongs.value &&
+    selecting.value.singleIds.length === requiredSingles.value,
+)
+
 function start(action: ActionDef, effort: ActionEffortOption) {
-  store.startAction(action.id, effort.label)
+  // Gravações com requisito de músicas/singles passam pela seleção; demais iniciam direto.
+  if (action.requires?.songs || action.requires?.singles) {
+    selecting.value = { action, effort, songIds: [], singleIds: [] }
+  } else {
+    store.startAction(action.id, effort.label)
+  }
+}
+
+function toggleSong(id: string) {
+  if (!selecting.value) return
+  const arr = selecting.value.songIds
+  const i = arr.indexOf(id)
+  if (i >= 0) arr.splice(i, 1)
+  else if (arr.length < requiredSongs.value) arr.push(id)
+}
+
+function toggleSingle(id: string) {
+  if (!selecting.value) return
+  const arr = selecting.value.singleIds
+  const i = arr.indexOf(id)
+  if (i >= 0) arr.splice(i, 1)
+  else if (arr.length < requiredSingles.value) arr.push(id)
+}
+
+function confirmSelection() {
+  if (!selecting.value || !selectionComplete.value) return
+  const { action, effort, songIds, singleIds } = selecting.value
+  store.startAction(action.id, effort.label, {
+    ...(songIds.length ? { songIds } : {}),
+    ...(singleIds.length ? { singleIds } : {}),
+  })
+  selecting.value = null
+}
+
+function cancelSelection() {
+  selecting.value = null
 }
 
 function advance() {
@@ -190,9 +293,95 @@ function advance() {
   border-radius: var(--bq-radius-md);
 }
 
-.loop-bar__songs {
+.loop-bar__hint {
+  font-size: var(--bq-text-sm);
+  color: var(--bq-text-faint);
+}
+
+/* Seletor de faixas ao gravar (feature 0015, D6). */
+.track-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bq-space-3);
+  padding: var(--bq-space-4);
+  background: var(--bq-bg-elevated);
+  border: 1px solid var(--bq-spotlight);
+  border-radius: var(--bq-radius-md);
+}
+
+.track-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.track-picker__close {
+  background: none;
+  border: none;
+  color: var(--bq-text-muted);
+  cursor: pointer;
+  font-size: var(--bq-text-md);
+}
+
+.track-picker__hint,
+.track-picker__sub {
   font-size: var(--bq-text-sm);
   color: var(--bq-text-muted);
+}
+
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bq-space-1);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: var(--bq-space-3);
+  padding: var(--bq-space-2) var(--bq-space-3);
+  background: var(--bq-bg-surface);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-sm);
+  font-size: var(--bq-text-sm);
+  cursor: pointer;
+}
+
+.picker-row__name {
+  font-weight: var(--bq-weight-semibold);
+}
+
+.picker-row__meta {
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-muted);
+}
+
+.picker-row__q {
+  margin-left: auto;
+  font-family: var(--bq-font-mono);
+  font-size: var(--bq-text-xs);
+  color: var(--bq-spotlight);
+}
+
+.track-picker__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--bq-space-3);
+}
+
+.picker-cancel {
+  padding: var(--bq-space-2) var(--bq-space-4);
+  font-size: var(--bq-text-sm);
+  color: var(--bq-text-muted);
+  background: var(--bq-bg-surface);
+  border: 1px solid var(--bq-border);
+  border-radius: var(--bq-radius-md);
+  cursor: pointer;
 }
 
 .advance-btn {
@@ -209,6 +398,11 @@ function advance() {
 
 .advance-btn:hover {
   filter: brightness(1.08);
+}
+
+.advance-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .section-title {

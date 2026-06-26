@@ -61,4 +61,27 @@ describe('GameView', () => {
     expect(store.turn).toBe(2) // play-show dura 1 dia
     expect(store.activeActions).toHaveLength(0)
   })
+
+  it('opens the track picker for a recording and records the selected song (0015 D6)', async () => {
+    const store = useGameStore()
+    store.startAction('compose')
+    store.advanceToNextCompletion() // 1 música disponível
+    const wrapper = render()
+
+    // o esforço "Single" não inicia direto — abre o seletor de faixas
+    const singleBtn = wrapper.findAll('.effort-btn').find((b) => b.text().includes('Single ·'))
+    expect(singleBtn).toBeTruthy()
+    await singleBtn!.trigger('click')
+    expect(wrapper.find('.track-picker').exists()).toBe(true)
+    expect(store.activeActions).toHaveLength(0) // ainda não iniciou
+
+    // marca a música e confirma
+    await wrapper.find('.picker-row input').setValue(true)
+    const confirm = wrapper.findAll('button').find((b) => b.text().includes('Confirmar'))
+    await confirm!.trigger('click')
+
+    expect(store.activeActions).toHaveLength(1)
+    expect(store.activeActions[0]?.actionId).toBe('record-single')
+    expect(wrapper.find('.track-picker').exists()).toBe(false) // seletor fechou
+  })
 })

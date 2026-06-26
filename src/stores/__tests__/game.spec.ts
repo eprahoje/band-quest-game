@@ -284,6 +284,50 @@ describe('game store', () => {
       expect(rec.ok).toBe(false)
     })
 
+    it('records the explicitly selected song, not the oldest (0015 D6)', () => {
+      const store = freshGame()
+      composeSongs(store, 2) // duas músicas: a 1ª é a mais antiga
+      const newest = store.songs[1]!
+      // seleciona explicitamente a 2ª música (a que o auto-pick NÃO escolheria)
+      const rec = store.startAction('record-single', undefined, { songIds: [newest.id] })
+      expect(rec.ok).toBe(true)
+      store.advanceToNextCompletion()
+      const single = store.releases.find((r) => r.type === 'single')!
+      expect(single.trackIds).toEqual([newest.id])
+      // a 1ª música segue disponível (não foi consumida)
+      expect(store.availableSongs).toHaveLength(1)
+      expect(store.availableSongs[0]!.id).toBe(store.songs[0]!.id)
+    })
+
+    it('rejects a selection whose count does not match the requirement (0015 D6)', () => {
+      const store = freshGame()
+      composeSongs(store, 2)
+      const ids = store.songs.map((s) => s.id)
+      const rec = store.startAction('record-single', undefined, { songIds: ids }) // 2 p/ 1 vaga
+      expect(rec.ok).toBe(false)
+      expect(store.activeActions).toHaveLength(0)
+      // nenhuma música foi consumida
+      expect(store.availableSongs).toHaveLength(2)
+    })
+
+    it('edits song metadata and renames a release (0015 D7)', () => {
+      const store = freshGame()
+      composeSongs(store, 1)
+      const songId = store.songs[0]!.id
+      store.editSong(songId, { name: 'Minha Canção', genre: 'Punk', theme: 'Rebeldia' })
+      expect(store.songs[0]!.name).toBe('Minha Canção')
+      expect(store.songs[0]!.genre).toBe('Punk')
+      expect(store.songs[0]!.theme).toBe('Rebeldia')
+      // campos vazios são ignorados
+      store.editSong(songId, { name: '   ' })
+      expect(store.songs[0]!.name).toBe('Minha Canção')
+
+      recordSingle(store)
+      const single = store.releases[0]!
+      store.renameRelease(single.id, 'Hit do Verão')
+      expect(store.releases[0]!.title).toBe('Hit do Verão')
+    })
+
     it('blocks a main action when the band is fatigued', () => {
       const store = freshGame()
       store.applyStatDelta({ fatigue: 80 })
