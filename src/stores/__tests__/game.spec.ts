@@ -600,6 +600,34 @@ describe('game store', () => {
     })
   })
 
+  describe('tour balance (Playtest 05 ponto 9)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('tour cachê escala com os fãs e supera uma bilheteria de show grande', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 35 }) // libera a turnê
+      const c0 = store.stats.cash
+      store.startAction('tour', 'Mini-turnê')
+      store.advanceToNextCompletion()
+      const gainNoFans = store.stats.cash - c0
+
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.applyStatDelta({ reputation: 35, fans: 2000 })
+      const c1 = store.stats.cash
+      store.startAction('tour', 'Mini-turnê')
+      store.advanceToNextCompletion()
+      const gainWithFans = store.stats.cash - c1
+
+      expect(gainWithFans).toBeGreaterThan(gainNoFans) // turnê cresce com a base de fãs
+      expect(gainWithFans).toBeGreaterThan(10000) // bate o teto de bilheteria de um show
+    })
+  })
+
   describe('venue catalog (feature 0016, slice 1)', () => {
     function freshGame() {
       const store = useGameStore()

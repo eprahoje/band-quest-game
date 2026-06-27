@@ -135,6 +135,11 @@ const PUBLIC_ACTION_IDS = new Set(['tour', 'record-demo', 'record-single', 'reco
 // Fadiga do dia do show (0016 slice 2) — o gig cansa; aplicada na data, como evento pontual.
 const SHOW_FATIGUE = 18
 
+// Balance da turnê (Playtest 05 ponto 9): cachê = (garantia + fãs × por-fã) × esforço × reput.
+// A turnê toca para a base de fãs em várias praças → escala com fãs. Placeholders (0003).
+const TOUR_GUARANTEE = 1500
+const TOUR_CASH_PER_FAN = 30
+
 export interface StartActionResult {
   ok: boolean
   reason?: string
@@ -456,6 +461,15 @@ export const useGameStore = defineStore('game', () => {
       qualityModifier: qualityModifier.value,
       reputationCashMultiplier: 1 + stats.value.reputation * REP_CASH_FACTOR,
     })
+    // Balance da turnê (Playtest 05 ponto 9): a turnê toca para a base de FÃS em várias
+    // praças, então o cachê escala com fãs (garantia + por-fã × esforço × reputação), em vez
+    // de um valor fixo que o show com bilheteria sempre superava. Substitui o cash do catálogo.
+    if (action.category === 'tour') {
+      const repMult = 1 + stats.value.reputation * REP_CASH_FACTOR
+      deltas.cash = Math.round(
+        (TOUR_GUARANTEE + stats.value.fans * TOUR_CASH_PER_FAN) * effort.outcomeModifier * repMult,
+      )
+    }
     // Consequência do excesso de fadiga (0014 it-05): se a banda concluiu a ação acima
     // do soft cap (100), a performance é "no limite" — reduz os ganhos positivos e ainda
     // custa reputação, proporcional ao quanto passou. A fadiga já foi acumulada no avanço.
