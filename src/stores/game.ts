@@ -458,7 +458,13 @@ export const useGameStore = defineStore('game', () => {
           ? 'Demo gravada — os primeiros fãs a caminho.'
           : `"${release.title}" foi lançado!`
     }
-    // O evento reporta os efeitos aplicados como chips (Playtest 02, ponto 9).
+    // O evento reporta os efeitos aplicados como chips (Playtest 02, ponto 9). A fadiga
+    // é acumulada por dia no avanço (0014 it-04), não vem em `deltas`; mas o acontecimento
+    // ainda deve mostrar quanto a ação custou/recuperou de fadiga (Playtest 04 imediato) —
+    // atribuímos o total da ação (taxa × duração) só para o chip, sem reaplicar ao estado.
+    if (action.fatiguePerDay) {
+      ;(deltas as Partial<BandStats>).fatigue = Math.round(action.fatiguePerDay * active.totalTurns)
+    }
     logEvent(active.category, message, effectsFromDeltas(deltas))
   }
 

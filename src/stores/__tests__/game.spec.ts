@@ -443,8 +443,9 @@ describe('game store', () => {
       const effects = store.recentEvents[0]?.effects ?? []
       expect(effects.some((e) => e.label.includes('fãs') && e.tone === 'pos')).toBe(true)
       expect(effects.some((e) => e.label.includes('R$'))).toBe(true)
-      // A fadiga não é mais chip de conclusão (0014 it-04): sobe gradual no painel.
-      expect(effects.some((e) => e.label.includes('fadiga'))).toBe(false)
+      // A fadiga acumula por dia (0014 it-04), mas o evento ainda reporta o total da ação
+      // como chip negativo (Playtest 04 imediato): show = 18/dia × 1 dia = +18.
+      expect(effects.some((e) => e.label.includes('fadiga') && e.tone === 'neg')).toBe(true)
     })
   })
 
@@ -498,6 +499,16 @@ describe('game store', () => {
       store.startAction('tour', 'Mini-turnê') // 14 dias: só +28 da turnê, sem -14 passivo
       store.advanceToNextCompletion()
       expect(store.stats.fatigue).toBe(38) // 10 + 28 (sem recuperação passiva)
+    })
+
+    it('reports the action fatigue cost/recovery as a chip (Playtest 04 imediato)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fatigue: 50 })
+      store.startAction('rest')
+      store.advanceToNextCompletion() // descanso: -6/dia × 5 = -30
+      const effects = store.recentEvents[0]?.effects ?? []
+      // recuperação aparece como chip positivo de fadiga ("-30 fadiga", tom pos)
+      expect(effects.some((e) => e.label.includes('fadiga') && e.tone === 'pos')).toBe(true)
     })
   })
 
