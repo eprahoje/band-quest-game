@@ -4,6 +4,7 @@ import { createDefaultRoster, type BandMember } from '@/data/cast'
 import { getAction, resolveEffort, resolveOutcome, type ActionLane } from '@/data/actions'
 import { createSong, type Song } from '@/data/songs'
 import { createRelease, accrueRoyalty, ROYALTY_PROFILE, type Release } from '@/data/releases'
+import { VENUES, isVenueUnlocked, missingRequirement } from '@/data/venues'
 import {
   computeScore,
   computeStars,
@@ -206,6 +207,14 @@ export const useGameStore = defineStore('game', () => {
     releases.value.filter((r) => r.type === 'single' && !r.consumedByAlbumId),
   )
   const songById = (id: string) => songs.value.find((s) => s.id === id)
+
+  // Catálogo de locais com estado de desbloqueio derivado da reputação + fãs (0016 slice 1).
+  const venueCatalog = computed(() =>
+    VENUES.map((venue) => {
+      const stat = { reputation: stats.value.reputation, fans: stats.value.fans }
+      return { venue, unlocked: isVenueUnlocked(venue, stat), missing: missingRequirement(venue, stat) }
+    }),
+  )
 
   const isGameStarted = computed(() => currentView.value === 'game')
   const isFatigued = computed(() => stats.value.fatigue >= 80)
@@ -727,6 +736,7 @@ export const useGameStore = defineStore('game', () => {
     availableSongs,
     releases,
     availableSingles,
+    venueCatalog,
     activeActions,
     isGameStarted,
     isFatigued,

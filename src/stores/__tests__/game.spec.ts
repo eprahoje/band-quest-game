@@ -600,6 +600,33 @@ describe('game store', () => {
     })
   })
 
+  describe('venue catalog (feature 0016, slice 1)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('exposes the catalog with only the starting bar unlocked at game start', () => {
+      const store = freshGame()
+      expect(store.venueCatalog.length).toBeGreaterThan(1)
+      const bar = store.venueCatalog.find((e) => e.venue.id === 'bar')!
+      expect(bar.unlocked).toBe(true)
+      const casa = store.venueCatalog.find((e) => e.venue.id === 'casa')!
+      expect(casa.unlocked).toBe(false)
+      expect(casa.missing).toContain('reputação')
+    })
+
+    it('unlocks a venue once reputation and fans cross the thresholds', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 15, fans: 300 }) // limiares da casa de shows
+      const casa = store.venueCatalog.find((e) => e.venue.id === 'casa')!
+      expect(casa.unlocked).toBe(true)
+      expect(casa.missing).toBeNull()
+    })
+  })
+
   describe('royalties (feature 0015, slice 4 / D4)', () => {
     function freshGame() {
       const store = useGameStore()

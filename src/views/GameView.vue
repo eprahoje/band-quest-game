@@ -158,6 +158,8 @@
 
     <SongLibrary />
 
+    <VenueList />
+
     <CollapsibleSection title="Ações" aria-label="Ações disponíveis">
       <div class="actions__grid">
         <article
@@ -211,6 +213,7 @@ import EventFeed from '@/components/EventFeed.vue'
 import MemberCard from '@/components/MemberCard.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SongLibrary from '@/components/SongLibrary.vue'
+import VenueList from '@/components/VenueList.vue'
 import { useGameStore } from '@/stores/game'
 import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'
 import { SONG_GENRES, SONG_THEMES, pickGenre, pickTheme } from '@/data/songs'
