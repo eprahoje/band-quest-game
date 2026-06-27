@@ -54,17 +54,17 @@ describe('resolveOutcome', () => {
     const action = getAction('play-show')
     const effort = resolveEffort(action)
     const out = resolveOutcome(action, effort, { rng: noVariance, qualityModifier: 1 })
-    expect(out).toEqual({ cash: 150, reputation: 1, fans: 30, fatigue: 18 })
+    // A fadiga não vive mais nos deltas de conclusão (0014 it-04): é taxa por dia.
+    expect(out).toEqual({ cash: 150, reputation: 1, fans: 30 })
   })
 
-  it('scales positive non-fatigue gains by the quality modifier', () => {
+  it('scales positive gains by the quality modifier', () => {
     const action = getAction('play-show')
     const out = resolveOutcome(action, resolveEffort(action), {
       rng: noVariance,
       qualityModifier: 1.2,
     })
     expect(out.fans).toBe(36) // 30 * 1.2
-    expect(out.fatigue).toBe(18) // fadiga não escala com qualidade
   })
 
   it('scales positive gains by the effort outcome modifier (caprichado)', () => {

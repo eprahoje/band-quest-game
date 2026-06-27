@@ -55,6 +55,11 @@ export interface ActionDef {
   // Lançamento gerado ao concluir (feature 0015): demo | single | album.
   release?: ReleaseType
   outcome: ActionOutcome
+  // Fadiga acumulada POR DIA enquanto a ação está em curso (0014 it-04). Substitui o
+  // antigo lump-sum de fadiga na conclusão: a fadiga total fica proporcional à duração
+  // (turnê longa cansa mais que curta). Negativo = recuperação ativa (descansar).
+  // Omitido = não mexe na fadiga (ex.: marketing em background).
+  fatiguePerDay?: number
   // Ações de recuperação (ex.: descansar) podem ser iniciadas mesmo com a banda
   // exausta — caso contrário a fadiga vira um soft-lock (playtest 2026-06-24, ponto 2).
   allowWhenFatigued?: boolean
@@ -71,7 +76,8 @@ export const ACTIONS: readonly ActionDef[] = [
       { label: 'Ensaio leve', durationTurns: 2, costModifier: 1, outcomeModifier: 1 },
       { label: 'Ensaio pesado', durationTurns: 4, costModifier: 1, outcomeModifier: 1.6 },
     ],
-    outcome: { metrics: { reputation: 1, fatigue: 10 }, variance: 0.1 },
+    fatiguePerDay: 4,
+    outcome: { metrics: { reputation: 1 }, variance: 0.1 },
   },
   {
     id: 'compose',
@@ -81,7 +87,8 @@ export const ACTIONS: readonly ActionDef[] = [
     description: 'Compõe uma nova música (insumo para gravar).',
     effortOptions: [{ label: 'Compor', durationTurns: 5, costModifier: 1, outcomeModifier: 1 }],
     produces: { songs: 1 },
-    outcome: { metrics: { fatigue: 8 }, variance: 0.15 },
+    fatiguePerDay: 1.5,
+    outcome: { metrics: {}, variance: 0.15 },
   },
   {
     id: 'record-demo',
@@ -92,6 +99,7 @@ export const ACTIONS: readonly ActionDef[] = [
     effortOptions: [{ label: 'Demo caseira', durationTurns: 3, costModifier: 1, outcomeModifier: 1 }],
     requires: { songs: 3 },
     release: 'demo',
+    fatiguePerDay: 1.5,
     outcome: { metrics: { cash: -150, reputation: 1, fans: 25 }, variance: 0.2 },
   },
   {
@@ -106,6 +114,7 @@ export const ACTIONS: readonly ActionDef[] = [
     ],
     requires: { songs: 1 },
     release: 'single',
+    fatiguePerDay: 1.5,
     outcome: { metrics: { cash: -400, reputation: 2, fans: 120 }, variance: 0.2 },
   },
   {
@@ -120,6 +129,7 @@ export const ACTIONS: readonly ActionDef[] = [
     ],
     requires: { singles: 2, songs: 4 },
     release: 'album',
+    fatiguePerDay: 1.5,
     outcome: { metrics: { cash: -1500, reputation: 6, fans: 600 }, variance: 0.25 },
   },
   {
@@ -129,7 +139,8 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'show',
     description: 'Toca um show e ganha cachê, fãs e reputação.',
     effortOptions: [{ label: 'Show local', durationTurns: 1, costModifier: 1, outcomeModifier: 1 }],
-    outcome: { metrics: { cash: 150, reputation: 1, fans: 30, fatigue: 18 }, variance: 0.2 },
+    fatiguePerDay: 18,
+    outcome: { metrics: { cash: 150, reputation: 1, fans: 30 }, variance: 0.2 },
   },
   {
     id: 'tour',
@@ -142,7 +153,8 @@ export const ACTIONS: readonly ActionDef[] = [
       { label: 'Turnê nacional', durationTurns: 45, costModifier: 1.5, outcomeModifier: 1.6 },
     ],
     requires: { reputation: 30 },
-    outcome: { metrics: { cash: 1800, reputation: 5, fans: 500, fatigue: 45 }, variance: 0.25 },
+    fatiguePerDay: 2,
+    outcome: { metrics: { cash: 1800, reputation: 5, fans: 500 }, variance: 0.25 },
   },
   {
     id: 'marketing',
@@ -160,7 +172,8 @@ export const ACTIONS: readonly ActionDef[] = [
     category: 'rest',
     description: 'A banda descansa e recupera energia.',
     effortOptions: [{ label: 'Descanso', durationTurns: 5, costModifier: 1, outcomeModifier: 1 }],
-    outcome: { metrics: { fatigue: -30 }, variance: 0 },
+    fatiguePerDay: -6,
+    outcome: { metrics: {}, variance: 0 },
     allowWhenFatigued: true,
   },
 ]

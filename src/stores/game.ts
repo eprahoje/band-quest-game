@@ -563,6 +563,23 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // Fadiga POR DIA do trecho avançado (0014 it-04): soma a taxa de cada ação ativa
+  // (`fatiguePerDay`) durante os `days` dias. A recuperação passiva (Playtest 02, ponto 8)
+  // só corre em dias OCIOSOS — sem nenhuma ação `main` em curso (tocar/gravar/turnê não
+  // descansam de graça). `rest` recupera pela própria taxa negativa. Arredonda p/ inteiro.
+  function applyFatigueForSpan(days: number) {
+    let delta = 0
+    let mainActive = false
+    for (const a of activeActions.value) {
+      const action = getAction(a.actionId)
+      if (action.lane === 'main') mainActive = true
+      if (action.fatiguePerDay) delta += action.fatiguePerDay * days
+    }
+    if (!mainActive) delta -= days * PASSIVE_FATIGUE_RECOVERY_PER_DAY
+    delta = Math.round(delta)
+    if (delta !== 0) applyStatDelta({ fatigue: delta })
+  }
+
   // Avança `days` dias: cobra custos mensais, aplica decay, e conclui ações prontas.
   function advanceDays(days: number) {
     if (days <= 0 || currentView.value !== 'game') return
@@ -573,8 +590,7 @@ export const useGameStore = defineStore('game', () => {
     chargeMonthlyCosts(oldTurn, turn.value)
     flushRoyalties(oldTurn, turn.value)
     applyReputationDecay(days)
-    // Recuperação passiva de energia ao passar o tempo (Playtest 02, ponto 8).
-    applyStatDelta({ fatigue: -days * PASSIVE_FATIGUE_RECOVERY_PER_DAY })
+    applyFatigueForSpan(days)
 
     const remaining: ActiveAction[] = []
     const completed: ActiveAction[] = []

@@ -342,8 +342,8 @@ describe('game store', () => {
       // descansar NÃO pode ser bloqueado pela fadiga (playtest 2026-06-24, ponto 2)
       expect(store.canStartAction('rest').ok).toBe(true)
       expect(store.startAction('rest').ok).toBe(true)
-      store.advanceToNextCompletion() // 5 dias: -5 passivo + -30 do descanso
-      expect(store.stats.fatigue).toBe(55) // 90 - 5 - 30
+      store.advanceToNextCompletion() // 5 dias × -6/dia (sem passivo durante ação main)
+      expect(store.stats.fatigue).toBe(60) // 90 - 30
       expect(store.isFatigued).toBe(false)
     })
 
@@ -443,8 +443,61 @@ describe('game store', () => {
       const effects = store.recentEvents[0]?.effects ?? []
       expect(effects.some((e) => e.label.includes('fãs') && e.tone === 'pos')).toBe(true)
       expect(effects.some((e) => e.label.includes('R$'))).toBe(true)
-      // fadiga subindo é reportada como efeito negativo
-      expect(effects.some((e) => e.label.includes('fadiga') && e.tone === 'neg')).toBe(true)
+      // A fadiga não é mais chip de conclusão (0014 it-04): sobe gradual no painel.
+      expect(effects.some((e) => e.label.includes('fadiga'))).toBe(false)
+    })
+  })
+
+  describe('fatigue model — per-day (0014 it-04, Playtest 04 pontos 2 e 6)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('a longer tour fatigues more than a shorter one (proporcional à duração)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 30 })
+      store.startAction('tour', 'Mini-turnê') // 14 dias × 2/dia = +28
+      store.advanceToNextCompletion()
+      const miniFatigue = store.stats.fatigue
+      expect(miniFatigue).toBe(28)
+
+      // novo jogo: zera o estado (mesma instância de store no Pinia de teste)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.applyStatDelta({ reputation: 30 })
+      store.startAction('tour', 'Turnê nacional') // 45 dias × 2/dia = +90
+      store.advanceToNextCompletion()
+      const nationalFatigue = store.stats.fatigue
+      expect(nationalFatigue).toBe(90)
+
+      expect(nationalFatigue).toBeGreaterThan(miniFatigue)
+    })
+
+    it('recording an album increases fatigue (não zera) — bug do Playtest 04 ponto 6', () => {
+      const store = freshGame()
+      // monta os insumos do álbum (2 singles + 4 músicas) sem mexer na fadiga à mão
+      for (let i = 0; i < 6; i++) {
+        store.startAction('compose')
+        store.advanceToNextCompletion()
+      }
+      store.startAction('record-single')
+      store.advanceToNextCompletion()
+      store.startAction('record-single')
+      store.advanceToNextCompletion()
+      const before = store.stats.fatigue
+      store.startAction('record-album') // 35 dias × 1.5/dia ≈ +53, sem recuperação passiva
+      store.advanceToNextCompletion()
+      expect(store.stats.fatigue).toBeGreaterThan(before)
+    })
+
+    it('does not apply passive recovery while a main action is in progress', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 30, fatigue: 10 })
+      store.startAction('tour', 'Mini-turnê') // 14 dias: só +28 da turnê, sem -14 passivo
+      store.advanceToNextCompletion()
+      expect(store.stats.fatigue).toBe(38) // 10 + 28 (sem recuperação passiva)
     })
   })
 
