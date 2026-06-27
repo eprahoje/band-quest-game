@@ -54,8 +54,17 @@ describe('resolveOutcome', () => {
     const action = getAction('play-show')
     const effort = resolveEffort(action)
     const out = resolveOutcome(action, effort, { rng: noVariance, qualityModifier: 1 })
-    // A fadiga não vive mais nos deltas de conclusão (0014 it-04): é taxa por dia.
-    expect(out).toEqual({ cash: 150, reputation: 2, fans: 30 })
+    // A fadiga não vive mais nos deltas (0014 it-04). A reputação do show é faixa 1–5
+    // (0014 it-07): com rng 0.5 → 1 + floor(0.5×5) = 3.
+    expect(out).toEqual({ cash: 150, reputation: 3, fans: 30 })
+  })
+
+  it('rolls reputation within the declared range (0014 it-07)', () => {
+    const action = getAction('play-show') // reputationRange [1, 5]
+    const lo = resolveOutcome(action, resolveEffort(action), { rng: () => 0 }).reputation
+    const hi = resolveOutcome(action, resolveEffort(action), { rng: () => 0.999 }).reputation
+    expect(lo).toBe(1)
+    expect(hi).toBe(5)
   })
 
   it('scales positive gains by the quality modifier', () => {

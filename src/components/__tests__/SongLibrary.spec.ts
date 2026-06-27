@@ -39,29 +39,37 @@ vi.mock('@/stores/game', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/stores/game')>()
   return {
     ...actual,
-    useGameStore: () => ({ songs, releases, calendarAt: actual.computeCalendar, editSong, renameRelease }),
+    useGameStore: () => ({
+      songs,
+      availableSongs: songs.filter((s) => s.status === 'composed'),
+      releases,
+      calendarAt: actual.computeCalendar,
+      editSong,
+      renameRelease,
+      discardSong: () => true,
+    }),
   }
 })
 
 import SongLibrary from '@/components/SongLibrary.vue'
 
 describe('SongLibrary (feature 0015, slice 5)', () => {
-  it('lists songs with metadata, quality and status', () => {
+  it('lists only composed songs in the Músicas tab (Playtest 04 ponto 2)', () => {
     const wrapper = mount(SongLibrary)
+    expect(wrapper.text()).toContain('Nova Noite') // composed → aba Músicas
+    expect(wrapper.text()).toContain('Q 55') // qualidade da música pronta
+    // 'Última Estrada' (released) não aparece como música pronta — vive nos Lançamentos
+    // (como faixa do single). O nome ainda aparece na seção de Lançamentos.
     expect(wrapper.text()).toContain('Última Estrada')
-    expect(wrapper.text()).toContain('Nova Noite')
-    expect(wrapper.text()).toContain('Estrada') // tema/gênero
-    expect(wrapper.text()).toContain('Q 72')
-    expect(wrapper.text()).toContain('Pronta') // status composed
-    expect(wrapper.text()).toContain('Lançada') // status released
   })
 
-  it('lists releases with type, title and formatted release date', () => {
+  it('lists releases with type, title, date and track names (Playtest 04 ponto 2)', () => {
     const wrapper = mount(SongLibrary)
     expect(wrapper.text()).toContain('Single')
     const c = computeCalendar(40)
     expect(wrapper.text()).toContain(`${c.displayYear} · ${c.monthName}, dia ${c.day}`)
-    expect(wrapper.text()).toContain('1 faixa(s)')
+    // faixa pelo NOME (não mais "N faixa(s)")
+    expect(wrapper.text()).toContain('Última Estrada')
   })
 
   it('shows the current royalty per release (D4)', () => {
@@ -72,7 +80,7 @@ describe('SongLibrary (feature 0015, slice 5)', () => {
   it('shows the count hint per section', () => {
     const wrapper = mount(SongLibrary)
     const hints = wrapper.findAll('.collapsible__hint').map((h) => h.text())
-    expect(hints).toContain('2') // músicas
+    expect(hints).toContain('1') // músicas prontas (só a composed)
     expect(hints).toContain('1') // lançamentos
   })
 

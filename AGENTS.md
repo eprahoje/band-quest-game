@@ -6,6 +6,7 @@ This repository implements the Band Quest features documented in `../band-quest-
 
 - Start from the matching feature documentation in `../band-quest-docs/docs/features/`.
 - Read `planning/overview.md`, then the latest `refinement/iteration-XX.md`, then `refinement/questions.md`.
+- For mechanics/economy/progression/structural-UI slices, read and follow the approved `planning/plan-NN.md` (gate G1.5) before writing code; do not start without it.
 - Review `../band-quest-docs/docs/memory-bank/iteration-playbook.md` before starting feature work.
 - Check `refinement/checklist.md` and `refinement/log.md` before implementing.
 - Check the feature `refinement/log.md` to understand the latest decisions and unresolved items.
@@ -24,11 +25,17 @@ Each feature should arrive here already refined enough to be implemented in smal
 
 The canonical phase/gate model lives in
 `../band-quest-docs/docs/memory-bank/ai-dlc.md` — read it before starting a cycle.
-A feature only arrives here **after Inception's gate G1** (spec approved). This
-repo owns three of the four active phases:
+A feature only arrives here **after Inception's gate G1** (spec approved), and a
+mechanics/economy/progression/structural-UI slice only starts coding **after gate
+G1.5** — the slice's `planning/plan-NN.md` approved by the human. Read that plan
+first; the code follows it, and relevant deviations go back into the plan before
+you proceed (don't let them surface only at playtest). This repo owns three of the
+four active phases:
 
-- **Implement** — code against the spec + `tokens.css`, with Vitest tests written
-  alongside the code. Exit gate **G2**: new behavior implemented and covered.
+- **Implement** — code against the spec + `tokens.css`, following the approved
+  `plan-NN.md`, with Vitest tests written alongside the code. Exit gate **G2**:
+  new behavior implemented and covered; when there was a plan, the code reconciles
+  with it (each `Dx` has change + test).
 - **Validate** — the "gate verde": `npm run test:unit`, `npm run type-check`,
   `npm run lint`, build, plus a manual playtest (logged in
   `../band-quest-docs/docs/playtests/`) when mechanics change. Exit gate **G3**.

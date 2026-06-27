@@ -40,6 +40,10 @@ export interface ActionOutcome {
   // deltas-base aplicados ao concluir (placeholders de balance — 0003).
   metrics: Partial<Record<ActionStat, number>>
   variance: number // 0..1: amplitude da aleatoriedade leve (Q4)
+  // Reputação por FAIXA aleatória [min, max] (0014 it-07 / Playtest 04 ponto 4): quando
+  // presente, sobrepõe `metrics.reputation` com um inteiro sorteado no intervalo (ex.:
+  // shows locais rendem 1–5). Placeholder de balance (0003).
+  reputationRange?: readonly [number, number]
   eventChance?: number // chance de evento (0009) — interrupção fica para a slice da 0009
 }
 
@@ -144,7 +148,8 @@ export const ACTIONS: readonly ActionDef[] = [
     effortOptions: [{ label: 'Show local', durationTurns: 1, costModifier: 1, outcomeModifier: 1 }],
     fatiguePerDay: 18,
     cashScalesWithReputation: true,
-    outcome: { metrics: { cash: 150, reputation: 2, fans: 30 }, variance: 0.2 },
+    // Reputação do show é sorteada entre 1 e 5 (Playtest 04 ponto 4) — sem valor fixo.
+    outcome: { metrics: { cash: 150, fans: 30 }, variance: 0.2, reputationRange: [1, 5] },
   },
   {
     id: 'tour',
@@ -226,6 +231,11 @@ export function resolveOutcome(
     if (key === 'cash' && base > 0 && action.cashScalesWithReputation) v *= repCashMult
     v *= factor
     result[key] = Math.round(v)
+  }
+  // Reputação por faixa aleatória (Playtest 04 ponto 4): sobrepõe o valor-base.
+  if (action.outcome.reputationRange) {
+    const [lo, hi] = action.outcome.reputationRange
+    result.reputation = lo + Math.floor(rng() * (hi - lo + 1))
   }
   return result
 }

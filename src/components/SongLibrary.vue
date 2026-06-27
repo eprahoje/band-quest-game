@@ -2,15 +2,15 @@
   <div class="song-library">
     <CollapsibleSection
       title="Músicas"
-      aria-label="Inventário de músicas"
-      :hint="String(store.songs.length)"
+      aria-label="Inventário de músicas prontas"
+      :hint="String(store.availableSongs.length)"
       :default-open="false"
     >
-      <p v-if="store.songs.length === 0" class="song-library__empty">
-        Nenhuma música ainda. Componha a primeira!
+      <p v-if="store.availableSongs.length === 0" class="song-library__empty">
+        Nenhuma música pronta. Componha uma nova — as lançadas ficam na aba Lançamentos.
       </p>
       <ul v-else class="lib-list">
-        <li v-for="s in store.songs" :key="s.id" class="lib-row">
+        <li v-for="s in store.availableSongs" :key="s.id" class="lib-row">
           <template v-if="editingSongId === s.id">
             <input v-model="draft.name" class="lib-input" aria-label="Nome" placeholder="Nome" />
             <input v-model="draft.genre" class="lib-input lib-input--sm" aria-label="Estilo" placeholder="Estilo" />
@@ -22,7 +22,6 @@
             <span class="lib-row__name">{{ s.name }}</span>
             <span class="lib-row__meta">{{ s.genre }} · {{ s.theme }}</span>
             <span class="lib-row__quality">Q {{ s.quality }}</span>
-            <span class="lib-tag" :class="`lib-tag--${s.status}`">{{ SONG_STATUS_LABEL[s.status] }}</span>
             <button class="lib-edit" type="button" aria-label="Editar música" @click="startEditSong(s)">
               ✎
             </button>
@@ -59,7 +58,7 @@
           </template>
           <template v-else>
             <span class="lib-row__name">{{ r.title }}</span>
-            <span class="lib-row__meta">{{ dateLabel(r.releaseTurn) }} · {{ r.trackIds.length }} faixa(s)</span>
+            <span class="lib-row__meta">{{ dateLabel(r.releaseTurn) }} · {{ trackNames(r) }}</span>
             <span class="lib-row__royalty">{{ royaltyLabel(r) }}</span>
             <span class="lib-row__quality">Q {{ r.quality }}</span>
             <button class="lib-edit" type="button" aria-label="Renomear lançamento" @click="startEditRelease(r)">
@@ -76,14 +75,18 @@
 import { reactive, ref } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
-import type { Song, SongStatus } from '@/data/songs'
+import type { Song } from '@/data/songs'
 import type { Release, ReleaseType } from '@/data/releases'
 
 const store = useGameStore()
 
-const SONG_STATUS_LABEL: Record<SongStatus, string> = {
-  composed: 'Pronta',
-  released: 'Lançada',
+// Faixas de um lançamento, pelo nome (Playtest 04 ponto 2): as músicas lançadas vivem
+// aqui, não na aba Músicas (que só lista as prontas, evitando confusão com o descarte).
+function trackNames(r: Release): string {
+  const names = r.trackIds
+    .map((id) => store.songs.find((s) => s.id === id)?.name)
+    .filter((n): n is string => !!n)
+  return names.length ? names.join(', ') : '—'
 }
 
 const RELEASE_TYPE_LABEL: Record<ReleaseType, string> = {
