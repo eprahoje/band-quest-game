@@ -68,12 +68,23 @@
         </li>
       </ul>
     </CollapsibleSection>
+
+    <ConfirmDialog
+      :open="!!discarding"
+      title="Descartar música?"
+      :message="discarding ? `“${discarding.name}” será removida da banda. Essa ação não pode ser desfeita.` : ''"
+      confirm-label="Descartar"
+      danger
+      @confirm="confirmDiscard"
+      @cancel="discarding = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useGameStore } from '@/stores/game'
 import type { Song } from '@/data/songs'
 import type { Release, ReleaseType } from '@/data/releases'
@@ -142,11 +153,15 @@ function cancelEdit() {
 }
 
 // Descarte de música não lançada (Playtest 04 ponto 5). Música lançada não aparece com
-// o botão (referenciada por um Release). Confirmação evita descarte acidental.
+// o botão (referenciada por um Release). Confirmação via ConfirmDialog do design system
+// (Playtest 05 ponto 5 — substitui o window.confirm nativo).
+const discarding = ref<Song | null>(null)
 function discard(s: Song) {
-  if (window.confirm(`Descartar "${s.name}"? Essa ação não pode ser desfeita.`)) {
-    store.discardSong(s.id)
-  }
+  discarding.value = s
+}
+function confirmDiscard() {
+  if (discarding.value) store.discardSong(discarding.value.id)
+  discarding.value = null
 }
 </script>
 

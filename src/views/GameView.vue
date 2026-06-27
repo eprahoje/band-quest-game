@@ -23,18 +23,14 @@
         Escolha o gênero e o tema. O título é gerado automaticamente (editável depois).
       </p>
       <div class="compose-fields">
-        <label class="compose-field">
+        <div class="compose-field">
           <span class="compose-field__label">Gênero</span>
-          <select v-model="composing.genre" class="compose-select">
-            <option v-for="g in genres" :key="g" :value="g">{{ g }}</option>
-          </select>
-        </label>
-        <label class="compose-field">
+          <SelectField v-model="composing.genre" :options="genres" aria-label="Gênero" />
+        </div>
+        <div class="compose-field">
           <span class="compose-field__label">Tema</span>
-          <select v-model="composing.theme" class="compose-select">
-            <option v-for="t in themes" :key="t" :value="t">{{ t }}</option>
-          </select>
-        </label>
+          <SelectField v-model="composing.theme" :options="themes" aria-label="Tema" />
+        </div>
       </div>
       <div class="track-picker__actions">
         <button class="picker-cancel" type="button" @click="randomizeCompose">🎲 Aleatório</button>
@@ -214,6 +210,7 @@ import MemberCard from '@/components/MemberCard.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SongLibrary from '@/components/SongLibrary.vue'
 import VenueList from '@/components/VenueList.vue'
+import SelectField from '@/components/SelectField.vue'
 import { useGameStore } from '@/stores/game'
 import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'
 import { SONG_GENRES, SONG_THEMES, pickGenre, pickTheme } from '@/data/songs'
@@ -511,16 +508,6 @@ function advance() {
   color: var(--bq-text-muted);
   text-transform: uppercase;
   letter-spacing: var(--bq-tracking-caps);
-}
-
-.compose-select {
-  padding: var(--bq-space-2) var(--bq-space-3);
-  font-size: var(--bq-text-sm);
-  color: var(--bq-text);
-  background: var(--bq-bg);
-  border: 1px solid var(--bq-border-strong);
-  border-radius: var(--bq-radius-sm);
-  cursor: pointer;
 }
 
 .track-picker__actions {
