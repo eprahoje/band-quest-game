@@ -4,7 +4,13 @@ import { createDefaultRoster, type BandMember } from '@/data/cast'
 import { getAction, resolveEffort, resolveOutcome, type ActionLane } from '@/data/actions'
 import { createSong, type Song } from '@/data/songs'
 import { createRelease, accrueRoyalty, ROYALTY_PROFILE, type Release } from '@/data/releases'
-import { VENUES, isVenueUnlocked, missingRequirement } from '@/data/venues'
+import {
+  VENUES,
+  isVenueUnlocked,
+  missingRequirement,
+  computeShowResult,
+  getVenue,
+} from '@/data/venues'
 import {
   computeScore,
   computeStars,
@@ -64,6 +70,13 @@ export interface ActiveAction {
   composeTheme?: string
 }
 
+// Show agendado num local para uma data futura (feature 0016 slice 2 / D4).
+export interface ScheduledShow {
+  id: string
+  venueId: string
+  turnDue: number // turno (dia absoluto) em que o show acontece
+}
+
 const INITIAL_STATS: BandStats = {
   reputation: 0, // começa em 0; sem teto superior (Playtest 02, ponto 1)
   cash: 500,
@@ -116,14 +129,11 @@ const REP_DECAY_EVERY = 10 // após a carência, perde 1 de reputação a cada N
 const REP_CASH_FACTOR = 0.01
 
 // Ações voltadas ao público — zeram a inatividade (evitam decay de reputação).
-const PUBLIC_ACTION_IDS = new Set([
-  'play-show',
-  'tour',
-  'record-demo',
-  'record-single',
-  'record-album',
-  'marketing',
-])
+// (Shows agora são agendados por local — ver scheduledShows; eles também zeram a inatividade.)
+const PUBLIC_ACTION_IDS = new Set(['tour', 'record-demo', 'record-single', 'record-album', 'marketing'])
+
+// Fadiga do dia do show (0016 slice 2) — o gig cansa; aplicada na data, como evento pontual.
+const SHOW_FATIGUE = 18
 
 export interface StartActionResult {
   ok: boolean
@@ -185,6 +195,8 @@ export const useGameStore = defineStore('game', () => {
   // Lançamentos: demo/single/álbum (feature 0015, slice 3).
   const releases = ref<Release[]>([])
   const activeActions = ref<ActiveAction[]>([])
+  // Shows agendados por local (feature 0016 slice 2): compromisso datado que dispara na data.
+  const scheduledShows = ref<ScheduledShow[]>([])
   // Dias desde a última atividade pública (para o decay de reputação).
   const inactiveDays = ref(0)
   // Total de royalties recebidos na sessão (receita de longo prazo — slice 4 / D4).
@@ -193,6 +205,7 @@ export const useGameStore = defineStore('game', () => {
   let eventSeq = 0
   let songSeq = 0
   let releaseSeq = 0
+  let showSeq = 0
   // Resíduo fracionário de royalty: mantém o caixa inteiro creditando só a parte inteira.
   let royaltyResidual = 0
   // Royalty acumulado desde o último relatório mensal (creditado no caixa; flush no evento).
@@ -234,8 +247,12 @@ export const useGameStore = defineStore('game', () => {
 
   // Dias até a próxima conclusão de ação (1 se não houver ações ativas).
   const nextCompletionDays = computed(() => {
-    if (activeActions.value.length === 0) return 1
-    return Math.min(...activeActions.value.map((a) => a.turnsRemaining))
+    // próximo evento = menor entre conclusões de ação e shows agendados (0016 slice 2)
+    const days = [
+      ...activeActions.value.map((a) => a.turnsRemaining),
+      ...scheduledShows.value.map((s) => s.turnDue - turn.value),
+    ].filter((d) => d > 0)
+    return days.length ? Math.min(...days) : 1
   })
 
   // Qualidade da banda (0..1) = média dos atributos dos membros / 100.
@@ -281,11 +298,13 @@ export const useGameStore = defineStore('game', () => {
     songs.value = []
     releases.value = []
     activeActions.value = []
+    scheduledShows.value = []
     inactiveDays.value = 0
     royaltiesEarnedTotal.value = 0
     eventSeq = 0
     songSeq = 0
     releaseSeq = 0
+    showSeq = 0
     royaltyResidual = 0
     pendingRoyalty = 0
     turn.value = 1
@@ -524,8 +543,6 @@ export const useGameStore = defineStore('game', () => {
         return 'A banda ensaiou e está mais afiada.'
       case 'rest':
         return 'A banda descansou e recuperou energia.'
-      case 'play-show':
-        return 'A banda tocou um show e ganhou novos fãs.'
       case 'tour':
         return 'A turnê terminou — exaustiva, mas valeu a pena.'
       case 'marketing':
@@ -660,7 +677,51 @@ export const useGameStore = defineStore('game', () => {
       if (PUBLIC_ACTION_IDS.has(a.actionId)) inactiveDays.value = 0
     }
 
+    fireScheduledShows()
     checkEndConditions(days)
+  }
+
+  // Dispara os shows agendados cuja data chegou (0016 slice 2 / D4): credita
+  // cachê + bilheteria (computeShowResult), fãs e reputação, e cobra a fadiga do gig.
+  function fireScheduledShows() {
+    const due = scheduledShows.value.filter((s) => s.turnDue <= turn.value)
+    if (due.length === 0) return
+    scheduledShows.value = scheduledShows.value.filter((s) => s.turnDue > turn.value)
+    for (const s of due) {
+      const venue = getVenue(s.venueId)
+      const result = computeShowResult(venue, {
+        reputation: stats.value.reputation,
+        fans: stats.value.fans,
+        reputationCashMultiplier: 1 + stats.value.reputation * REP_CASH_FACTOR,
+        rng: randomFn,
+      })
+      const deltas: Partial<BandStats> = {
+        cash: result.cash,
+        fans: result.fansGained,
+        reputation: result.reputationGained,
+        fatigue: SHOW_FATIGUE,
+      }
+      applyStatDelta(deltas)
+      inactiveDays.value = 0 // show é atividade pública
+      logEvent(
+        'show',
+        `Show em ${venue.name} — público de ${result.attendance.toLocaleString('pt-BR')}.`,
+        effectsFromDeltas(deltas),
+      )
+    }
+  }
+
+  // Agenda um show num local desbloqueado para daqui a `leadDays` dias (0016 slice 2).
+  function scheduleShow(venueId: string, leadDays: number): StartActionResult {
+    const venue = VENUES.find((v) => v.id === venueId)
+    if (!venue) return { ok: false, reason: 'Local desconhecido.' }
+    const stat = { reputation: stats.value.reputation, fans: stats.value.fans }
+    if (!isVenueUnlocked(venue, stat)) {
+      return { ok: false, reason: `Local travado. Requer ${missingRequirement(venue, stat)}.` }
+    }
+    const lead = Math.max(1, Math.round(leadDays))
+    scheduledShows.value.push({ id: String(++showSeq), venueId, turnDue: turn.value + lead })
+    return { ok: true }
   }
 
   // Salta o relógio até a próxima conclusão de ação (1 dia se nada estiver ativo).
@@ -678,6 +739,7 @@ export const useGameStore = defineStore('game', () => {
     songs.value = []
     releases.value = []
     activeActions.value = []
+    scheduledShows.value = []
     inactiveDays.value = 0
     royaltiesEarnedTotal.value = 0
     outcome.value = null
@@ -685,6 +747,7 @@ export const useGameStore = defineStore('game', () => {
     eventSeq = 0
     songSeq = 0
     releaseSeq = 0
+    showSeq = 0
     royaltyResidual = 0
     pendingRoyalty = 0
     turn.value = 0
@@ -737,6 +800,8 @@ export const useGameStore = defineStore('game', () => {
     releases,
     availableSingles,
     venueCatalog,
+    scheduledShows,
+    scheduleShow,
     activeActions,
     isGameStarted,
     isFatigued,

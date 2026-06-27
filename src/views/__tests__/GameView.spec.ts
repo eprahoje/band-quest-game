@@ -29,7 +29,7 @@ describe('GameView', () => {
 
   it('renders an action card with effort buttons for each catalog action', () => {
     const wrapper = render()
-    expect(wrapper.text()).toContain('Tocar show')
+    expect(wrapper.text()).toContain('Ensaiar')
     expect(wrapper.text()).toContain('Gravar álbum')
     expect(wrapper.findAll('.effort-btn').length).toBeGreaterThan(0)
   })
@@ -50,22 +50,22 @@ describe('GameView', () => {
   it('starts an action when an effort button is clicked', async () => {
     const wrapper = render()
     const store = useGameStore()
-    const showBtn = wrapper.findAll('.effort-btn').find((b) => b.text().includes('Show local'))
-    expect(showBtn).toBeTruthy()
-    await showBtn!.trigger('click')
+    const btn = wrapper.findAll('.effort-btn').find((b) => b.text().includes('Ensaio leve'))
+    expect(btn).toBeTruthy()
+    await btn!.trigger('click')
     expect(store.activeActions).toHaveLength(1)
-    expect(store.activeActions[0]?.actionId).toBe('play-show')
+    expect(store.activeActions[0]?.actionId).toBe('rehearse')
   })
 
   it('advances time and completes a queued action', async () => {
     const wrapper = render()
     const store = useGameStore()
-    const showBtn = wrapper.findAll('.effort-btn').find((b) => b.text().includes('Show local'))
-    await showBtn!.trigger('click')
+    const btn = wrapper.findAll('.effort-btn').find((b) => b.text().includes('Ensaio leve'))
+    await btn!.trigger('click')
     const advanceBtn = wrapper.findAll('button').find((b) => b.text().includes('Avançar'))
     expect(advanceBtn).toBeTruthy()
     await advanceBtn!.trigger('click')
-    expect(store.turn).toBe(2) // play-show dura 1 dia
+    expect(store.turn).toBe(3) // ensaio leve dura 2 dias (turno 1 → 3)
     expect(store.activeActions).toHaveLength(0)
   })
 

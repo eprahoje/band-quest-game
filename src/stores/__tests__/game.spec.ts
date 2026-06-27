@@ -169,8 +169,8 @@ describe('game store', () => {
 
     it('queues a main action and blocks a second main action', () => {
       const store = freshGame()
-      expect(store.startAction('play-show').ok).toBe(true)
-      expect(store.activeMainAction?.actionId).toBe('play-show')
+      expect(store.startAction('compose').ok).toBe(true)
+      expect(store.activeMainAction?.actionId).toBe('compose')
       expect(store.canStartMain).toBe(false)
       const second = store.startAction('rehearse')
       expect(second.ok).toBe(false)
@@ -178,13 +178,14 @@ describe('game store', () => {
 
     it('completes a finished action and applies its outcome', () => {
       const store = freshGame()
+      store.applyStatDelta({ reputation: 35 }) // libera a turnê
       const cashBefore = store.stats.cash
-      store.startAction('play-show') // duração 1 dia
+      store.startAction('tour', 'Mini-turnê')
       store.advanceToNextCompletion()
       expect(store.activeActions).toHaveLength(0)
       expect(store.stats.cash).toBeGreaterThan(cashBefore)
       expect(store.stats.fans).toBeGreaterThan(0)
-      expect(store.recentEvents[0]?.category).toBe('show')
+      expect(store.recentEvents[0]?.category).toBe('tour')
     })
 
     it('keeps a multi-day action active until its duration elapses', () => {
@@ -334,7 +335,7 @@ describe('game store', () => {
       const store = freshGame()
       store.applyStatDelta({ fatigue: 80 })
       expect(store.isFatigued).toBe(true)
-      expect(store.canStartAction('play-show').ok).toBe(false)
+      expect(store.canStartAction('compose').ok).toBe(false)
     })
 
     it('allows resting even when fatigued (no soft-lock) and recovers energy', () => {
@@ -351,7 +352,7 @@ describe('game store', () => {
 
     it('runs a background action in parallel with a main action', () => {
       const store = freshGame()
-      expect(store.startAction('play-show').ok).toBe(true)
+      expect(store.startAction('compose').ok).toBe(true)
       expect(store.startAction('marketing').ok).toBe(true)
       expect(store.activeActions).toHaveLength(2)
     })
@@ -365,7 +366,7 @@ describe('game store', () => {
 
     it('clears active actions and songs on a new game', () => {
       const store = freshGame()
-      store.startAction('play-show')
+      store.startAction('compose')
       store.startGame({ bandName: 'C', genre: 'Pop', originTrait: 'Garagem' })
       expect(store.activeActions).toHaveLength(0)
       expect(store.songs).toHaveLength(0)
@@ -426,8 +427,8 @@ describe('game store', () => {
       const store = freshGame()
       store.advanceDays(35) // acumula inatividade (ainda sem decay: 5 além da carência)
       expect(store.inactiveDays).toBe(35)
-      store.startAction('play-show')
-      store.advanceToNextCompletion() // show é atividade pública
+      store.scheduleShow('bar', 1) // show agendado é atividade pública (0016)
+      store.advanceToNextCompletion()
       expect(store.inactiveDays).toBe(0)
     })
 
@@ -438,15 +439,14 @@ describe('game store', () => {
       expect(store.stats.fatigue).toBe(40)
     })
 
-    it('completion events report the applied effects as chips (Playtest 02)', () => {
+    it('show events report the applied effects as chips (Playtest 02 / 0016)', () => {
       const store = freshGame()
-      store.startAction('play-show')
-      store.advanceToNextCompletion()
+      store.scheduleShow('bar', 1)
+      store.advanceToNextCompletion() // o show dispara na data
       const effects = store.recentEvents[0]?.effects ?? []
       expect(effects.some((e) => e.label.includes('fãs') && e.tone === 'pos')).toBe(true)
       expect(effects.some((e) => e.label.includes('R$'))).toBe(true)
-      // A fadiga acumula por dia (0014 it-04), mas o evento ainda reporta o total da ação
-      // como chip negativo (Playtest 04 imediato): show = 18/dia × 1 dia = +18.
+      // o gig cobra fadiga (SHOW_FATIGUE) — chip negativo
       expect(effects.some((e) => e.label.includes('fadiga') && e.tone === 'neg')).toBe(true)
     })
   })
@@ -585,14 +585,14 @@ describe('game store', () => {
     it('cachê de show escala com a reputação (ponto 4)', () => {
       const store = freshGame()
       const cash0 = store.stats.cash
-      store.startAction('play-show')
+      store.scheduleShow('bar', 1)
       store.advanceToNextCompletion()
       const gainLowRep = store.stats.cash - cash0
 
       store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
       store.applyStatDelta({ reputation: 100 })
       const cashBefore = store.stats.cash
-      store.startAction('play-show')
+      store.scheduleShow('bar', 1)
       store.advanceToNextCompletion()
       const gainHighRep = store.stats.cash - cashBefore
 
@@ -624,6 +624,28 @@ describe('game store', () => {
       const casa = store.venueCatalog.find((e) => e.venue.id === 'casa')!
       expect(casa.unlocked).toBe(true)
       expect(casa.missing).toBeNull()
+    })
+
+    it('refuses to schedule a show at a locked venue (slice 2)', () => {
+      const store = freshGame()
+      expect(store.scheduleShow('ginasio', 7).ok).toBe(false) // travado no início
+      expect(store.scheduledShows).toHaveLength(0)
+    })
+
+    it('schedules a dated show and fires it on the date, crediting cachê + bilheteria', () => {
+      const store = freshGame()
+      store.applyStatDelta({ fans: 200 }) // público para a bilheteria do bar (cap 80)
+      const cashBefore = store.stats.cash
+      expect(store.scheduleShow('bar', 7).ok).toBe(true)
+      expect(store.scheduledShows).toHaveLength(1)
+
+      expect(store.nextCompletionDays).toBe(7) // o relógio salta até a data do show
+      store.advanceToNextCompletion()
+
+      expect(store.scheduledShows).toHaveLength(0) // disparou
+      // cachê (100) + bilheteria (min(200,80)=80 × R$10 = 800) = 900
+      expect(store.stats.cash).toBe(cashBefore + 900)
+      expect(store.recentEvents[0]?.category).toBe('show')
     })
   })
 

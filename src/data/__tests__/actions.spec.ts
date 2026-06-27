@@ -51,39 +51,30 @@ describe('actions catalog', () => {
 
 describe('resolveOutcome', () => {
   it('returns base deltas with no variance and neutral quality', () => {
-    const action = getAction('play-show')
-    const effort = resolveEffort(action)
+    const action = getAction('tour')
+    const effort = resolveEffort(action) // Mini-turnê (outcomeModifier 1)
     const out = resolveOutcome(action, effort, { rng: noVariance, qualityModifier: 1 })
-    // A fadiga não vive mais nos deltas (0014 it-04). A reputação do show é faixa 1–5
-    // (0014 it-07): com rng 0.5 → 1 + floor(0.5×5) = 3.
-    expect(out).toEqual({ cash: 150, reputation: 3, fans: 30 })
-  })
-
-  it('rolls reputation within the declared range (0014 it-07)', () => {
-    const action = getAction('play-show') // reputationRange [1, 5]
-    const lo = resolveOutcome(action, resolveEffort(action), { rng: () => 0 }).reputation
-    const hi = resolveOutcome(action, resolveEffort(action), { rng: () => 0.999 }).reputation
-    expect(lo).toBe(1)
-    expect(hi).toBe(5)
+    // A fadiga não vive mais nos deltas (0014 it-04: é taxa por dia).
+    expect(out).toEqual({ cash: 1800, reputation: 5, fans: 500 })
   })
 
   it('scales positive gains by the quality modifier', () => {
-    const action = getAction('play-show')
+    const action = getAction('tour')
     const out = resolveOutcome(action, resolveEffort(action), {
       rng: noVariance,
       qualityModifier: 1.2,
     })
-    expect(out.fans).toBe(36) // 30 * 1.2
+    expect(out.fans).toBe(600) // 500 * 1.2
   })
 
   it('scales positive cash by reputation when the action opts in (0014 it-06)', () => {
-    const action = getAction('play-show') // cashScalesWithReputation: true
+    const action = getAction('tour') // cashScalesWithReputation: true
     const out = resolveOutcome(action, resolveEffort(action), {
       rng: noVariance,
       qualityModifier: 1,
       reputationCashMultiplier: 1.5,
     })
-    expect(out.cash).toBe(225) // 150 * 1.5
+    expect(out.cash).toBe(2700) // 1800 * 1.5
   })
 
   it('scales positive gains by the effort outcome modifier (caprichado)', () => {
@@ -95,10 +86,10 @@ describe('resolveOutcome', () => {
   })
 
   it('applies variance within the declared bounds', () => {
-    const action = getAction('play-show') // variance 0.2
+    const action = getAction('tour') // variance 0.25
     const low = resolveOutcome(action, resolveEffort(action), { rng: () => 0, qualityModifier: 1 })
     const high = resolveOutcome(action, resolveEffort(action), { rng: () => 1, qualityModifier: 1 })
-    expect(low.fans).toBe(24) // 30 * (1 - 0.2)
-    expect(high.fans).toBe(36) // 30 * (1 + 0.2)
+    expect(low.fans).toBe(375) // 500 * (1 - 0.25)
+    expect(high.fans).toBe(625) // 500 * (1 + 0.25)
   })
 })
