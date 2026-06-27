@@ -538,6 +538,68 @@ describe('game store', () => {
     })
   })
 
+  describe('Playtest 04 leva (gênero na composição, descarte, cachê ∝ reputação)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('compose aplica o gênero e tema escolhidos (ponto 1.1)', () => {
+      const store = freshGame()
+      store.startAction('compose', undefined, { genre: 'Punk', theme: 'Rebeldia' })
+      store.advanceToNextCompletion()
+      const song = store.songs[0]!
+      expect(song.genre).toBe('Punk')
+      expect(song.theme).toBe('Rebeldia')
+    })
+
+    it('compose sem escolha autogera o metadado (gênero herdado da banda)', () => {
+      const store = freshGame()
+      store.startAction('compose')
+      store.advanceToNextCompletion()
+      expect(store.songs[0]!.genre).toBe('Rock') // herdado
+    })
+
+    it('descarta uma música pronta, mas não uma já lançada (ponto 5)', () => {
+      const store = freshGame()
+      store.startAction('compose')
+      store.advanceToNextCompletion()
+      const id = store.songs[0]!.id
+      expect(store.discardSong(id)).toBe(true)
+      expect(store.songs).toHaveLength(0)
+
+      // grava uma demo (3 músicas viram released) e tenta descartar uma lançada
+      for (let i = 0; i < 3; i++) {
+        store.startAction('compose')
+        store.advanceToNextCompletion()
+      }
+      store.startAction('record-demo')
+      store.advanceToNextCompletion()
+      const released = store.songs.find((s) => s.status === 'released')!
+      expect(store.discardSong(released.id)).toBe(false)
+      expect(store.songs.some((s) => s.id === released.id)).toBe(true)
+    })
+
+    it('cachê de show escala com a reputação (ponto 4)', () => {
+      const store = freshGame()
+      const cash0 = store.stats.cash
+      store.startAction('play-show')
+      store.advanceToNextCompletion()
+      const gainLowRep = store.stats.cash - cash0
+
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.applyStatDelta({ reputation: 100 })
+      const cashBefore = store.stats.cash
+      store.startAction('play-show')
+      store.advanceToNextCompletion()
+      const gainHighRep = store.stats.cash - cashBefore
+
+      expect(gainHighRep).toBeGreaterThan(gainLowRep)
+    })
+  })
+
   describe('royalties (feature 0015, slice 4 / D4)', () => {
     function freshGame() {
       const store = useGameStore()

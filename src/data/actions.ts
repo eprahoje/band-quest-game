@@ -55,6 +55,9 @@ export interface ActionDef {
   // Lançamento gerado ao concluir (feature 0015): demo | single | album.
   release?: ReleaseType
   outcome: ActionOutcome
+  // Cachê escala com a reputação (0014 it-06 / Playtest 04 ponto 4): shows e turnês
+  // pagam mais conforme a banda fica conhecida. Aplica-se só ao cash positivo.
+  cashScalesWithReputation?: boolean
   // Fadiga acumulada POR DIA enquanto a ação está em curso (0014 it-04). Substitui o
   // antigo lump-sum de fadiga na conclusão: a fadiga total fica proporcional à duração
   // (turnê longa cansa mais que curta). Negativo = recuperação ativa (descansar).
@@ -140,7 +143,8 @@ export const ACTIONS: readonly ActionDef[] = [
     description: 'Toca um show e ganha cachê, fãs e reputação.',
     effortOptions: [{ label: 'Show local', durationTurns: 1, costModifier: 1, outcomeModifier: 1 }],
     fatiguePerDay: 18,
-    outcome: { metrics: { cash: 150, reputation: 1, fans: 30 }, variance: 0.2 },
+    cashScalesWithReputation: true,
+    outcome: { metrics: { cash: 150, reputation: 2, fans: 30 }, variance: 0.2 },
   },
   {
     id: 'tour',
@@ -154,6 +158,7 @@ export const ACTIONS: readonly ActionDef[] = [
     ],
     requires: { reputation: 30 },
     fatiguePerDay: 2,
+    cashScalesWithReputation: true,
     outcome: { metrics: { cash: 1800, reputation: 5, fans: 500 }, variance: 0.25 },
   },
   {
@@ -193,6 +198,9 @@ export function resolveEffort(action: ActionDef, label?: string): ActionEffortOp
 export interface ResolveContext {
   rng?: () => number // 0..1, default Math.random
   qualityModifier?: number // default 1: escala ganhos positivos (não a fadiga)
+  // Multiplicador de cachê por reputação (0014 it-06), aplicado ao cash positivo das
+  // ações com `cashScalesWithReputation`. Default 1 (sem efeito).
+  reputationCashMultiplier?: number
 }
 
 // Calcula os deltas de uma ação concluída (puro/testável).
@@ -204,6 +212,7 @@ export function resolveOutcome(
 ): Partial<Record<ActionStat, number>> {
   const rng = ctx.rng ?? Math.random
   const quality = ctx.qualityModifier ?? 1
+  const repCashMult = ctx.reputationCashMultiplier ?? 1
   const factor = 1 + (rng() * 2 - 1) * action.outcome.variance
   const result: Partial<Record<ActionStat, number>> = {}
   for (const key of ACTION_STATS) {
@@ -213,6 +222,8 @@ export function resolveOutcome(
     if (key === 'cash' && base < 0) v *= effort.costModifier
     // ganhos positivos (não fadiga) escalam com a qualidade da banda E o esforço
     if (base > 0 && key !== 'fatigue') v *= quality * effort.outcomeModifier
+    // cachê (cash positivo) escala com a reputação nas ações marcadas (Playtest 04 ponto 4)
+    if (key === 'cash' && base > 0 && action.cashScalesWithReputation) v *= repCashMult
     v *= factor
     result[key] = Math.round(v)
   }

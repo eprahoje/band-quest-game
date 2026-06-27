@@ -26,6 +26,15 @@
             <button class="lib-edit" type="button" aria-label="Editar música" @click="startEditSong(s)">
               ✎
             </button>
+            <button
+              v-if="s.status === 'composed'"
+              class="lib-edit lib-edit--danger"
+              type="button"
+              aria-label="Descartar música"
+              @click="discard(s)"
+            >
+              🗑
+            </button>
           </template>
         </li>
       </ul>
@@ -127,6 +136,14 @@ function saveRelease(id: string) {
 function cancelEdit() {
   editingSongId.value = null
   editingReleaseId.value = null
+}
+
+// Descarte de música não lançada (Playtest 04 ponto 5). Música lançada não aparece com
+// o botão (referenciada por um Release). Confirmação evita descarte acidental.
+function discard(s: Song) {
+  if (window.confirm(`Descartar "${s.name}"? Essa ação não pode ser desfeita.`)) {
+    store.discardSong(s.id)
+  }
 }
 </script>
 
@@ -238,6 +255,10 @@ function cancelEdit() {
 
 .lib-edit:hover {
   color: var(--bq-spotlight);
+}
+
+.lib-edit--danger:hover {
+  color: var(--bq-ember);
 }
 
 .lib-input {

@@ -56,6 +56,21 @@ export const SONG_THEMES = [
   'Solidão',
 ] as const
 
+// Gêneros selecionáveis na composição (0015 it-03 / Playtest 04 ponto 1.1). Lista
+// estática IP-safe; a evolução por época ("invenção" de gêneros no tempo) é da 0008.
+export const SONG_GENRES = [
+  'Rock',
+  'Pop Rock',
+  'Punk',
+  'Hard Rock',
+  'Metal',
+  'Grunge',
+  'Indie',
+  'Alternativo',
+  'Pop',
+  'MPB',
+] as const
+
 function pick<T>(arr: readonly T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)] ?? arr[0]!
 }
@@ -67,6 +82,10 @@ export function generateSongName(rng: () => number = Math.random): string {
 
 export function pickTheme(rng: () => number = Math.random): string {
   return pick(SONG_THEMES, rng)
+}
+
+export function pickGenre(rng: () => number = Math.random): string {
+  return pick(SONG_GENRES, rng)
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))

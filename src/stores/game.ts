@@ -58,6 +58,9 @@ export interface ActiveAction {
   // Insumos reservados ao iniciar, para compor o lançamento ao concluir (feature 0015).
   consumedSongIds?: string[]
   consumedSingleIds?: string[]
+  // Gênero/tema escolhidos ao compor (Playtest 04 ponto 1.1), aplicados na conclusão.
+  composeGenre?: string
+  composeTheme?: string
 }
 
 const INITIAL_STATS: BandStats = {
@@ -107,6 +110,9 @@ export const MONTH_NAMES = [
 export const MEMBER_BASE_MONTHLY_COST = 100 // R$ por membro/mês (× fator de reputação)
 const REP_GRACE_DAYS = 30 // dias de inatividade pública antes de a reputação cair
 const REP_DECAY_EVERY = 10 // após a carência, perde 1 de reputação a cada N dias inativos
+// Cachê escala com reputação (0014 it-06): multiplicador = 1 + reputação × fator.
+// Ex.: 0.01 → reputação 50 paga +50% de cachê; reputação 100, +100%. Placeholder (0003).
+const REP_CASH_FACTOR = 0.01
 
 // Ações voltadas ao público — zeram a inatividade (evitam decay de reputação).
 const PUBLIC_ACTION_IDS = new Set([
@@ -127,6 +133,9 @@ export interface StartActionResult {
 export interface ActionSelection {
   songIds?: string[]
   singleIds?: string[]
+  // Escolha de gênero/tema ao compor (0015, Playtest 04 ponto 1.1). Ausente = autogerado.
+  genre?: string
+  theme?: string
 }
 
 export interface CalendarDate {
@@ -405,6 +414,8 @@ export const useGameStore = defineStore('game', () => {
       totalTurns: effort.durationTurns,
       ...(consumedSongIds.length ? { consumedSongIds } : {}),
       ...(consumedSingleIds.length ? { consumedSingleIds } : {}),
+      ...(selection?.genre ? { composeGenre: selection.genre } : {}),
+      ...(selection?.theme ? { composeTheme: selection.theme } : {}),
     })
     return { ok: true }
   }
@@ -415,6 +426,7 @@ export const useGameStore = defineStore('game', () => {
     const deltas = resolveOutcome(action, effort, {
       rng: randomFn,
       qualityModifier: qualityModifier.value,
+      reputationCashMultiplier: 1 + stats.value.reputation * REP_CASH_FACTOR,
     })
     // Consequência do excesso de fadiga (0014 it-05): se a banda concluiu a ação acima
     // do soft cap (100), a performance é "no limite" — reduz os ganhos positivos e ainda
@@ -439,7 +451,8 @@ export const useGameStore = defineStore('game', () => {
       for (let i = 0; i < action.produces.songs; i++) {
         const song = createSong({
           id: String(++songSeq),
-          genre: genre.value,
+          genre: active.composeGenre ?? genre.value,
+          ...(active.composeTheme ? { theme: active.composeTheme } : {}),
           bandQuality: bandQuality.value,
           effortModifier: effort.outcomeModifier,
           rng: randomFn,
@@ -683,6 +696,15 @@ export const useGameStore = defineStore('game', () => {
     if (release && title.trim()) release.title = title.trim()
   }
 
+  // Descarta uma música ainda não lançada (Playtest 04 ponto 5). Música já lançada é
+  // referenciada por um Release (discografia/royalties) e não pode ser removida.
+  function discardSong(id: string): boolean {
+    const song = songById(id)
+    if (!song || song.status !== 'composed') return false
+    songs.value = songs.value.filter((s) => s.id !== id)
+    return true
+  }
+
   // Seam de teste: injeta uma fonte de aleatoriedade determinística.
   function setRandomSource(fn: () => number) {
     randomFn = fn
@@ -727,6 +749,7 @@ export const useGameStore = defineStore('game', () => {
     startAction,
     editSong,
     renameRelease,
+    discardSong,
     advanceDays,
     advanceToNextCompletion,
     resetGame,

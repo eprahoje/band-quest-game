@@ -14,7 +14,35 @@
       <button class="advance-btn" type="button" @click="advance">{{ advanceLabel }}</button>
     </section>
 
-    <section v-if="selecting" class="track-picker" aria-label="Selecionar faixas">
+    <section v-if="composing" ref="composeRef" class="track-picker" aria-label="Compor música">
+      <header class="track-picker__head">
+        <strong>Compor · {{ composing.effort.label }}</strong>
+        <button class="track-picker__close" type="button" @click="cancelCompose">✕</button>
+      </header>
+      <p class="track-picker__hint">
+        Escolha o gênero e o tema. O título é gerado automaticamente (editável depois).
+      </p>
+      <div class="compose-fields">
+        <label class="compose-field">
+          <span class="compose-field__label">Gênero</span>
+          <select v-model="composing.genre" class="compose-select">
+            <option v-for="g in genres" :key="g" :value="g">{{ g }}</option>
+          </select>
+        </label>
+        <label class="compose-field">
+          <span class="compose-field__label">Tema</span>
+          <select v-model="composing.theme" class="compose-select">
+            <option v-for="t in themes" :key="t" :value="t">{{ t }}</option>
+          </select>
+        </label>
+      </div>
+      <div class="track-picker__actions">
+        <button class="picker-cancel" type="button" @click="randomizeCompose">🎲 Aleatório</button>
+        <button class="advance-btn" type="button" @click="confirmCompose">Compor</button>
+      </div>
+    </section>
+
+    <section v-if="selecting" ref="trackPickerRef" class="track-picker" aria-label="Selecionar faixas">
       <header class="track-picker__head">
         <strong>{{ selecting.action.name }} · {{ selecting.effort.label }}</strong>
         <button class="track-picker__close" type="button" @click="cancelSelection">✕</button>
@@ -176,7 +204,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import StatsPanel from '@/components/StatsPanel.vue'
 import EventFeed from '@/components/EventFeed.vue'
@@ -185,9 +213,13 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SongLibrary from '@/components/SongLibrary.vue'
 import { useGameStore } from '@/stores/game'
 import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'
+import { SONG_GENRES, SONG_THEMES, pickGenre, pickTheme } from '@/data/songs'
 
 const store = useGameStore()
 const router = useRouter()
+
+const genres = SONG_GENRES
+const themes = SONG_THEMES
 
 // Quando a sessão termina (vitória/derrota), vai para a tela de resultado (0010).
 watch(
@@ -233,6 +265,31 @@ const selectionComplete = computed(
     selecting.value.singleIds.length === requiredSingles.value,
 )
 
+// Escolha de gênero/tema ao compor (Playtest 04 ponto 1.1).
+interface Composing {
+  effort: ActionEffortOption
+  genre: string
+  theme: string
+}
+const composing = ref<Composing | null>(null)
+
+// Âncora (Playtest 04 ponto 1.5): ao abrir um painel de gravação/composição, puxa a
+// visão para ele (que aparece no topo, longe dos botões de ação clicados lá embaixo).
+const trackPickerRef = ref<HTMLElement | null>(null)
+const composeRef = ref<HTMLElement | null>(null)
+function anchorTo(el: HTMLElement | null) {
+  // scrollIntoView não existe em ambiente de teste (jsdom); guarda para não quebrar.
+  if (el && typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+watch(selecting, (v) => {
+  if (v) nextTick(() => anchorTo(trackPickerRef.value))
+})
+watch(composing, (v) => {
+  if (v) nextTick(() => anchorTo(composeRef.value))
+})
+
 // Preview de fadiga no card (0014 it-05): custo = taxa por dia × duração da opção.
 function fatigueCost(action: ActionDef, effort: ActionEffortOption): number {
   return action.fatiguePerDay ? Math.round(action.fatiguePerDay * effort.durationTurns) : 0
@@ -249,12 +306,32 @@ function fatigueText(action: ActionDef, effort: ActionEffortOption): string {
 }
 
 function start(action: ActionDef, effort: ActionEffortOption) {
-  // Gravações com requisito de músicas/singles passam pela seleção; demais iniciam direto.
-  if (action.requires?.songs || action.requires?.singles) {
+  if (action.id === 'compose') {
+    // Compor abre o seletor de gênero/tema (título é autogerado + editável depois).
+    composing.value = { effort, genre: store.genre || genres[0]!, theme: themes[0]! }
+  } else if (action.requires?.songs || action.requires?.singles) {
+    // Gravações com requisito de músicas/singles passam pela seleção de faixas.
     selecting.value = { action, effort, songIds: [], singleIds: [] }
   } else {
     store.startAction(action.id, effort.label)
   }
+}
+
+function randomizeCompose() {
+  if (!composing.value) return
+  composing.value.genre = pickGenre()
+  composing.value.theme = pickTheme()
+}
+
+function confirmCompose() {
+  if (!composing.value) return
+  const { effort, genre, theme } = composing.value
+  store.startAction('compose', effort.label, { genre, theme })
+  composing.value = null
+}
+
+function cancelCompose() {
+  composing.value = null
 }
 
 function toggleSong(id: string) {
@@ -409,6 +486,38 @@ function advance() {
   font-family: var(--bq-font-mono);
   font-size: var(--bq-text-xs);
   color: var(--bq-spotlight);
+}
+
+/* Seletor de gênero/tema na composição (Playtest 04 ponto 1.1). */
+.compose-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bq-space-4);
+  margin: var(--bq-space-3) 0;
+}
+
+.compose-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bq-space-1);
+  flex: 1 1 160px;
+}
+
+.compose-field__label {
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--bq-tracking-caps);
+}
+
+.compose-select {
+  padding: var(--bq-space-2) var(--bq-space-3);
+  font-size: var(--bq-text-sm);
+  color: var(--bq-text);
+  background: var(--bq-bg);
+  border: 1px solid var(--bq-border-strong);
+  border-radius: var(--bq-radius-sm);
+  cursor: pointer;
 }
 
 .track-picker__actions {

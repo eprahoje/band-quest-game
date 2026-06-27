@@ -55,7 +55,7 @@ describe('resolveOutcome', () => {
     const effort = resolveEffort(action)
     const out = resolveOutcome(action, effort, { rng: noVariance, qualityModifier: 1 })
     // A fadiga não vive mais nos deltas de conclusão (0014 it-04): é taxa por dia.
-    expect(out).toEqual({ cash: 150, reputation: 1, fans: 30 })
+    expect(out).toEqual({ cash: 150, reputation: 2, fans: 30 })
   })
 
   it('scales positive gains by the quality modifier', () => {
@@ -65,6 +65,16 @@ describe('resolveOutcome', () => {
       qualityModifier: 1.2,
     })
     expect(out.fans).toBe(36) // 30 * 1.2
+  })
+
+  it('scales positive cash by reputation when the action opts in (0014 it-06)', () => {
+    const action = getAction('play-show') // cashScalesWithReputation: true
+    const out = resolveOutcome(action, resolveEffort(action), {
+      rng: noVariance,
+      qualityModifier: 1,
+      reputationCashMultiplier: 1.5,
+    })
+    expect(out.cash).toBe(225) // 150 * 1.5
   })
 
   it('scales positive gains by the effort outcome modifier (caprichado)', () => {
