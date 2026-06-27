@@ -712,6 +712,11 @@ export const useGameStore = defineStore('game', () => {
   }
 
   // Agenda um show num local desbloqueado para daqui a `leadDays` dias (0016 slice 2).
+  // A turnê (0014) é o que libera agendar VÁRIOS shows de uma vez (Playtest 05 ponto 8).
+  const canBookMultipleShows = computed(
+    () => stats.value.reputation >= (getAction('tour').requires?.reputation ?? 30),
+  )
+
   function scheduleShow(venueId: string, leadDays: number): StartActionResult {
     const venue = VENUES.find((v) => v.id === venueId)
     if (!venue) return { ok: false, reason: 'Local desconhecido.' }
@@ -719,8 +724,17 @@ export const useGameStore = defineStore('game', () => {
     if (!isVenueUnlocked(venue, stat)) {
       return { ok: false, reason: `Local travado. Requer ${missingRequirement(venue, stat)}.` }
     }
+    // 1 show por vez até a turnê liberar agendar vários (Playtest 05 ponto 8).
+    if (!canBookMultipleShows.value && scheduledShows.value.length >= 1) {
+      return { ok: false, reason: 'Só um show por vez até liberar a turnê.' }
+    }
     const lead = Math.max(1, Math.round(leadDays))
-    scheduledShows.value.push({ id: String(++showSeq), venueId, turnDue: turn.value + lead })
+    const turnDue = turn.value + lead
+    // Um show por data — a banda não toca em dois lugares no mesmo dia (Playtest 05 ponto 6).
+    if (scheduledShows.value.some((s) => s.turnDue === turnDue)) {
+      return { ok: false, reason: 'Já há um show agendado para essa data.' }
+    }
+    scheduledShows.value.push({ id: String(++showSeq), venueId, turnDue })
     return { ok: true }
   }
 
@@ -802,6 +816,7 @@ export const useGameStore = defineStore('game', () => {
     venueCatalog,
     scheduledShows,
     scheduleShow,
+    canBookMultipleShows,
     activeActions,
     isGameStarted,
     isFatigued,

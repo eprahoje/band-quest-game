@@ -16,6 +16,9 @@
       </ul>
     </div>
 
+    <p v-if="bookError" class="book-error">{{ bookError }}</p>
+    <p v-else-if="atShowLimit" class="book-hint">Só um show por vez — a turnê libera agendar vários.</p>
+
     <ul class="venue-list">
       <li
         v-for="entry in store.venueCatalog"
@@ -33,6 +36,7 @@
             :key="lead.days"
             type="button"
             class="book-btn"
+            :disabled="atShowLimit"
             @click="book(entry.venue.id, lead.days)"
           >
             {{ lead.label }}
@@ -45,13 +49,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
 import { VENUE_TIER_LABEL, getVenue } from '@/data/venues'
 
 const store = useGameStore()
 const unlockedCount = computed(() => store.venueCatalog.filter((e) => e.unlocked).length)
+
+// Limite "1 show por vez até a turnê" (Playtest 05 ponto 8).
+const atShowLimit = computed(() => !store.canBookMultipleShows && store.scheduledShows.length >= 1)
+const bookError = ref<string | null>(null)
 
 // Antecedência do agendamento (compromisso datado, D4) — placeholders.
 const LEAD_OPTIONS = [
@@ -61,7 +69,8 @@ const LEAD_OPTIONS = [
 ]
 
 function book(venueId: string, days: number) {
-  store.scheduleShow(venueId, days)
+  const r = store.scheduleShow(venueId, days)
+  bookError.value = r.ok ? null : (r.reason ?? 'Não foi possível agendar.')
 }
 
 function venueName(id: string): string {
@@ -112,6 +121,18 @@ function dateLabel(turn: number): string {
 
 .upcoming__date {
   margin-left: auto;
+  font-size: var(--bq-text-xs);
+  color: var(--bq-text-muted);
+}
+
+.book-error {
+  margin: 0 0 var(--bq-space-3);
+  font-size: var(--bq-text-sm);
+  color: var(--bq-ember);
+}
+
+.book-hint {
+  margin: 0 0 var(--bq-space-3);
   font-size: var(--bq-text-xs);
   color: var(--bq-text-muted);
 }

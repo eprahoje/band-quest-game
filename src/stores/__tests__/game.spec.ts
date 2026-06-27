@@ -647,6 +647,26 @@ describe('game store', () => {
       expect(store.stats.cash).toBe(cashBefore + 900)
       expect(store.recentEvents[0]?.category).toBe('show')
     })
+
+    it('limits to one scheduled show before the tour is unlocked (Playtest 05 ponto 8)', () => {
+      const store = freshGame() // reputação 0 < 30 (turnê travada)
+      expect(store.canBookMultipleShows).toBe(false)
+      expect(store.scheduleShow('bar', 7).ok).toBe(true)
+      const second = store.scheduleShow('bar', 14)
+      expect(second.ok).toBe(false)
+      expect(store.scheduledShows).toHaveLength(1)
+    })
+
+    it('allows multiple once the tour is unlocked but blocks same-day double-booking (Playtest 05 ponto 6)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 35 }) // libera a turnê → pode agendar vários
+      expect(store.canBookMultipleShows).toBe(true)
+      expect(store.scheduleShow('bar', 7).ok).toBe(true) // data turno+7
+      expect(store.scheduleShow('bar', 14).ok).toBe(true) // outra data — ok
+      const sameDay = store.scheduleShow('bar', 7) // mesma data do primeiro
+      expect(sameDay.ok).toBe(false)
+      expect(store.scheduledShows).toHaveLength(2)
+    })
   })
 
   describe('royalties (feature 0015, slice 4 / D4)', () => {
