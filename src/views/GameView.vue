@@ -157,7 +157,14 @@
               :disabled="group.disabled"
               @click="start(group.action, effort)"
             >
-              {{ effort.label }} · {{ effort.durationTurns }} dias
+              <span class="effort-btn__label">{{ effort.label }} · {{ effort.durationTurns }} dias</span>
+              <span
+                v-if="fatigueCost(group.action, effort) !== 0"
+                class="effort-btn__fatigue"
+                :class="{ 'effort-btn__fatigue--warn': wouldOverexert(group.action, effort) }"
+              >
+                {{ fatigueText(group.action, effort) }}
+              </span>
             </button>
           </div>
         </article>
@@ -225,6 +232,21 @@ const selectionComplete = computed(
     selecting.value.songIds.length === requiredSongs.value &&
     selecting.value.singleIds.length === requiredSingles.value,
 )
+
+// Preview de fadiga no card (0014 it-05): custo = taxa por dia × duração da opção.
+function fatigueCost(action: ActionDef, effort: ActionEffortOption): number {
+  return action.fatiguePerDay ? Math.round(action.fatiguePerDay * effort.durationTurns) : 0
+}
+function wouldOverexert(action: ActionDef, effort: ActionEffortOption): boolean {
+  const f = fatigueCost(action, effort)
+  return f > 0 && store.stats.fatigue + f > 100
+}
+function fatigueText(action: ActionDef, effort: ActionEffortOption): string {
+  const f = fatigueCost(action, effort)
+  if (f === 0) return ''
+  const base = f > 0 ? `+${f} fadiga` : `−${Math.abs(f)} fadiga`
+  return wouldOverexert(action, effort) ? `⚠ ${base}` : base
+}
 
 function start(action: ActionDef, effort: ActionEffortOption) {
   // Gravações com requisito de músicas/singles passam pela seleção; demais iniciam direto.
@@ -595,5 +617,24 @@ function advance() {
 
 .effort-btn:disabled {
   cursor: not-allowed;
+}
+
+/* Preview de fadiga por opção de esforço (0014 it-05). */
+.effort-btn {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--bq-space-1);
+  text-align: left;
+}
+
+.effort-btn__fatigue {
+  font-size: var(--bq-text-2xs, 0.6875rem);
+  font-weight: var(--bq-weight-medium);
+  color: var(--bq-text-muted);
+}
+
+.effort-btn__fatigue--warn {
+  color: var(--bq-ember);
+  font-weight: var(--bq-weight-semibold);
 }
 </style>

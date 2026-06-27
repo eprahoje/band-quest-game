@@ -78,10 +78,12 @@ describe('game store', () => {
       expect(store.stats.reputation).toBe(0) // piso 0
     })
 
-    it('clamps fatigue between 0 and 100', () => {
+    it('floors fatigue at 0 but has no upper cap (0014 it-05: overflow intencional)', () => {
       const store = useGameStore()
-      store.applyStatDelta({ fatigue: 999 })
-      expect(store.stats.fatigue).toBe(100)
+      store.applyStatDelta({ fatigue: 130 })
+      expect(store.stats.fatigue).toBe(130) // passa de 100 — overflow permitido
+      store.applyStatDelta({ fatigue: -999 })
+      expect(store.stats.fatigue).toBe(0) // piso 0 mantido
     })
 
     it('allows cash to go negative (debt) — feature 0003', () => {
@@ -509,6 +511,30 @@ describe('game store', () => {
       const effects = store.recentEvents[0]?.effects ?? []
       // recuperação aparece como chip positivo de fadiga ("-30 fadiga", tom pos)
       expect(effects.some((e) => e.label.includes('fadiga') && e.tone === 'pos')).toBe(true)
+    })
+
+    it('overexertion (>100) reduces gains and costs reputation (0014 it-05)', () => {
+      const store = freshGame()
+      // baseline: turnê concluída sem estourar o teto (fadiga 0 → 90)
+      store.applyStatDelta({ reputation: 30 })
+      store.startAction('tour', 'Turnê nacional')
+      store.advanceToNextCompletion()
+      expect(store.stats.fatigue).toBe(90) // < 100, sem penalidade
+      const baseRep = store.stats.reputation
+      const baseFans = store.stats.fans
+
+      // mesma turnê começando perto do limite → conclui acima de 100 (estouro)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      store.applyStatDelta({ reputation: 30, fatigue: 70 }) // 70 < 80 (pode iniciar)
+      store.startAction('tour', 'Turnê nacional')
+      store.advanceToNextCompletion()
+      expect(store.stats.fatigue).toBe(160) // 70 + 90, sem teto
+
+      // ganhos reduzidos + golpe de reputação → ambos menores que o baseline
+      expect(store.stats.fans).toBeLessThan(baseFans)
+      expect(store.stats.reputation).toBeLessThan(baseRep)
+      // o acontecimento sinaliza o desgaste
+      expect(store.recentEvents[0]?.message).toContain('passou do limite')
     })
   })
 

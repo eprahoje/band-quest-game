@@ -78,6 +78,13 @@ export const START_YEAR = 2000
 // Recuperação passiva de fadiga por dia avançado (Playtest 02, ponto 8).
 const PASSIVE_FATIGUE_RECOVERY_PER_DAY = 1
 
+// Excesso de fadiga (0014 it-05): a fadiga não tem teto superior; passar de 100 (o
+// "soft cap") ao concluir uma ação a penaliza. Números = placeholders de balance (0003).
+const FATIGUE_SOFT_CAP = 100
+const OVEREXERTION_GAIN_PENALTY_PER_POINT = 0.01 // -1% dos ganhos por ponto acima de 100
+const OVEREXERTION_GAIN_PENALTY_MAX = 0.5 // teto de -50% nos ganhos
+const OVEREXERTION_REP_PENALTY_PER_POINT = 0.1 // -0.1 de reputação por ponto acima de 100
+
 // Derrota por falência: caixa negativo por este número de dias consecutivos (0010).
 const BANKRUPTCY_DAYS = 90
 
@@ -280,8 +287,9 @@ export const useGameStore = defineStore('game', () => {
     // Caixa pode ficar negativo (dívida) — feature 0003.
     if (delta.cash !== undefined) s.cash = s.cash + delta.cash
     if (delta.fans !== undefined) s.fans = Math.max(0, s.fans + delta.fans)
-    if (delta.fatigue !== undefined)
-      s.fatigue = Math.max(0, Math.min(100, s.fatigue + delta.fatigue))
+    // Fadiga: piso 0, SEM teto superior (0014 it-05) — o overflow acima de 100 é
+    // intencional e penalizado na conclusão da ação (ver completeAction).
+    if (delta.fatigue !== undefined) s.fatigue = Math.max(0, s.fatigue + delta.fatigue)
   }
 
   function logEvent(category: EventCategory, message: string, effects?: EventEffect[]) {
@@ -408,6 +416,21 @@ export const useGameStore = defineStore('game', () => {
       rng: randomFn,
       qualityModifier: qualityModifier.value,
     })
+    // Consequência do excesso de fadiga (0014 it-05): se a banda concluiu a ação acima
+    // do soft cap (100), a performance é "no limite" — reduz os ganhos positivos e ainda
+    // custa reputação, proporcional ao quanto passou. A fadiga já foi acumulada no avanço.
+    const excess = Math.max(0, stats.value.fatigue - FATIGUE_SOFT_CAP)
+    const overexerted = excess > 0
+    if (overexerted) {
+      const gainFactor =
+        1 - Math.min(excess * OVEREXERTION_GAIN_PENALTY_PER_POINT, OVEREXERTION_GAIN_PENALTY_MAX)
+      for (const key of ['cash', 'fans', 'reputation'] as const) {
+        const v = deltas[key]
+        if (v !== undefined && v > 0) deltas[key] = Math.round(v * gainFactor)
+      }
+      const repHit = Math.round(excess * OVEREXERTION_REP_PENALTY_PER_POINT)
+      if (repHit > 0) deltas.reputation = (deltas.reputation ?? 0) - repHit
+    }
     applyStatDelta(deltas as Partial<BandStats>)
     // Cria as músicas produzidas com metadado autogerado e qualidade (feature 0015).
     let message = completionMessage(active)
@@ -465,6 +488,9 @@ export const useGameStore = defineStore('game', () => {
     if (action.fatiguePerDay) {
       ;(deltas as Partial<BandStats>).fatigue = Math.round(action.fatiguePerDay * active.totalTurns)
     }
+    // Flavor do excesso de fadiga (0014 it-05): os chips já mostram ganhos menores +
+    // reputação negativa; a mensagem sinaliza o porquê.
+    if (overexerted) message += ' A banda passou do limite — o desgaste cobrou seu preço.'
     logEvent(active.category, message, effectsFromDeltas(deltas))
   }
 
