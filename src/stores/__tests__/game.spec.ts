@@ -600,6 +600,55 @@ describe('game store', () => {
     })
   })
 
+  describe('staff and crew (feature 0013, slices 1 e 2)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('hires staff: charges the hire cost and tracks the monthly salary', () => {
+      const store = freshGame()
+      const cashBefore = store.stats.cash
+      store.hireStaff('roadie') // hireCost 500, salário 200 (placeholders)
+      expect(store.hiredStaff).toHaveLength(1)
+      expect(store.stats.cash).toBe(cashBefore - 500)
+      expect(store.monthlyStaffCost).toBe(200)
+    })
+
+    it('charges the staff salary together with the band on a month boundary', () => {
+      const store = freshGame() // 4 membros × 100 = 400/mês; rep 0
+      store.hireStaff('roadie') // +200/mês; cash 500 - 500 = 0
+      const cashAfterHire = store.stats.cash
+      store.advanceDays(30) // cruza 1 mês → cobra 400 (banda) + 200 (staff)
+      expect(store.stats.cash).toBe(cashAfterHire - 600)
+    })
+
+    it('fires staff (stops the salary)', () => {
+      const store = freshGame()
+      store.hireStaff('roadie')
+      const id = store.hiredStaff[0]!.id
+      store.fireStaff(id)
+      expect(store.hiredStaff).toHaveLength(0)
+      expect(store.monthlyStaffCost).toBe(0)
+    })
+
+    it('gates a bigger venue by crew: Aurora needs a roadie even when unlocked (ponto 7)', () => {
+      const store = freshGame()
+      store.applyStatDelta({ reputation: 15, fans: 300 }) // desbloqueia a casa (rep+fãs)
+      const casa = store.venueCatalog.find((e) => e.venue.id === 'casa')!
+      expect(casa.unlocked).toBe(true)
+      expect(casa.bookable).toBe(false) // falta a equipe
+
+      expect(store.scheduleShow('casa', 7).ok).toBe(false) // bloqueado sem roadie
+      store.hireStaff('roadie')
+      const casaAfter = store.venueCatalog.find((e) => e.venue.id === 'casa')!
+      expect(casaAfter.bookable).toBe(true)
+      expect(store.scheduleShow('casa', 7).ok).toBe(true) // agora libera
+    })
+  })
+
   describe('tour balance (Playtest 05 ponto 9)', () => {
     function freshGame() {
       const store = useGameStore()

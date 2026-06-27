@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { VENUES, isVenueUnlocked, missingRequirement, getVenue } from '@/data/venues'
+import {
+  VENUES,
+  isVenueUnlocked,
+  missingRequirement,
+  getVenue,
+  venueStaffShortfall,
+  venueStaffSatisfied,
+} from '@/data/venues'
 
 describe('venues (feature 0016, slice 1)', () => {
   it('the starting bar is unlocked at zero reputation and zero fans', () => {
@@ -26,5 +33,15 @@ describe('venues (feature 0016, slice 1)', () => {
     const caps = VENUES.map((v) => v.capacity)
     const sorted = [...caps].sort((a, b) => a - b)
     expect(caps).toEqual(sorted) // já está em ordem crescente de porte
+  })
+
+  it('the bar needs no crew; the casa needs a roadie (0013 gate)', () => {
+    const bar = getVenue('bar')
+    expect(venueStaffSatisfied(bar, {})).toBe(true)
+
+    const casa = getVenue('casa') // requiredStaff { roadie: 1 }
+    expect(venueStaffSatisfied(casa, {})).toBe(false)
+    expect(venueStaffShortfall(casa, {})).toEqual([{ role: 'roadie', need: 1 }])
+    expect(venueStaffSatisfied(casa, { roadie: 1 })).toBe(true)
   })
 })

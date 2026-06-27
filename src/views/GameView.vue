@@ -154,6 +154,8 @@
 
     <SongLibrary />
 
+    <StaffPanel />
+
     <VenueList />
 
     <CollapsibleSection title="Ações" aria-label="Ações disponíveis">
@@ -210,6 +212,7 @@ import MemberCard from '@/components/MemberCard.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SongLibrary from '@/components/SongLibrary.vue'
 import VenueList from '@/components/VenueList.vue'
+import StaffPanel from '@/components/StaffPanel.vue'
 import SelectField from '@/components/SelectField.vue'
 import { useGameStore } from '@/stores/game'
 import { ACTIONS, type ActionDef, type ActionEffortOption } from '@/data/actions'

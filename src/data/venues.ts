@@ -6,6 +6,8 @@
 // por isso `Venue` já nasce com `region` (default "Nacional"). Desbloqueio por REPUTAÇÃO
 // + FÃS (D2). Capacidade alimenta a bilheteria da slice 2. NÚMEROS = placeholders (0003).
 
+import type { StaffRole } from './staff'
+
 export type VenueTier = 'bar' | 'casa' | 'ginasio' | 'estadio'
 
 export const VENUE_TIER_LABEL: Record<VenueTier, string> = {
@@ -25,14 +27,16 @@ export interface Venue {
   minFans: number // público mínimo (fãs) para desbloquear
   baseCachet: number // garantia paga pelo show (escala com reputação no cálculo)
   ticketPrice: number // preço do ingresso (fixo por tier no MVP — D3)
+  // Equipe exigida para agendar (gate escalonado por tier — 0013 D4/slice 2). Ausente = livre.
+  requiredStaff?: Partial<Record<StaffRole, number>>
 }
 
 // Catálogo inicial — um local por tier (placeholders de balance, 0003).
 export const VENUES: readonly Venue[] = [
   { id: 'bar', name: 'Bar da Esquina', tier: 'bar', capacity: 80, region: 'Nacional', repThreshold: 0, minFans: 0, baseCachet: 100, ticketPrice: 10 },
-  { id: 'casa', name: 'Casa de Shows Aurora', tier: 'casa', capacity: 400, region: 'Nacional', repThreshold: 15, minFans: 300, baseCachet: 400, ticketPrice: 25 },
-  { id: 'ginasio', name: 'Ginásio Poliesportivo', tier: 'ginasio', capacity: 2000, region: 'Nacional', repThreshold: 45, minFans: 3000, baseCachet: 1500, ticketPrice: 50 },
-  { id: 'estadio', name: 'Estádio Nacional', tier: 'estadio', capacity: 15000, region: 'Nacional', repThreshold: 85, minFans: 20000, baseCachet: 5000, ticketPrice: 90 },
+  { id: 'casa', name: 'Casa de Shows Aurora', tier: 'casa', capacity: 400, region: 'Nacional', repThreshold: 15, minFans: 300, baseCachet: 400, ticketPrice: 25, requiredStaff: { roadie: 1 } },
+  { id: 'ginasio', name: 'Ginásio Poliesportivo', tier: 'ginasio', capacity: 2000, region: 'Nacional', repThreshold: 45, minFans: 3000, baseCachet: 1500, ticketPrice: 50, requiredStaff: { roadie: 2 } },
+  { id: 'estadio', name: 'Estádio Nacional', tier: 'estadio', capacity: 15000, region: 'Nacional', repThreshold: 85, minFans: 20000, baseCachet: 5000, ticketPrice: 90, requiredStaff: { roadie: 2, driver: 1 } },
 ]
 
 export interface UnlockStats {
@@ -57,6 +61,30 @@ export function getVenue(id: string): Venue {
   const v = VENUES.find((x) => x.id === id)
   if (!v) throw new Error(`Unknown venue: ${id}`)
   return v
+}
+
+// --- Gate de equipe (0013 slice 2 / D4) — falta de crew para agendar no local. ---
+export interface StaffShortfallItem {
+  role: StaffRole
+  need: number // quantos faltam contratar deste papel
+}
+
+// Papéis (e quantidades) que ainda faltam para a equipe exigida pelo local.
+export function venueStaffShortfall(
+  v: Venue,
+  counts: Partial<Record<StaffRole, number>>,
+): StaffShortfallItem[] {
+  const req = v.requiredStaff ?? {}
+  const out: StaffShortfallItem[] = []
+  for (const role of Object.keys(req) as StaffRole[]) {
+    const need = (req[role] ?? 0) - (counts[role] ?? 0)
+    if (need > 0) out.push({ role, need })
+  }
+  return out
+}
+
+export function venueStaffSatisfied(v: Venue, counts: Partial<Record<StaffRole, number>>): boolean {
+  return venueStaffShortfall(v, counts).length === 0
 }
 
 // --- Resultado do show (0016 slice 2 / D3) — receita = cachê + bilheteria. ---

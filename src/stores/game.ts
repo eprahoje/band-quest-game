@@ -10,7 +10,10 @@ import {
   missingRequirement,
   computeShowResult,
   getVenue,
+  venueStaffShortfall,
+  venueStaffSatisfied,
 } from '@/data/venues'
+import { getStaffRole, staffCountsByRole, type StaffMember, type StaffRole } from '@/data/staff'
 import {
   computeScore,
   computeStars,
@@ -202,6 +205,8 @@ export const useGameStore = defineStore('game', () => {
   const activeActions = ref<ActiveAction[]>([])
   // Shows agendados por local (feature 0016 slice 2): compromisso datado que dispara na data.
   const scheduledShows = ref<ScheduledShow[]>([])
+  // Equipe contratada (feature 0013): salário mensal + gate de locais.
+  const hiredStaff = ref<StaffMember[]>([])
   // Dias desde a última atividade pública (para o decay de reputação).
   const inactiveDays = ref(0)
   // Total de royalties recebidos na sessão (receita de longo prazo — slice 4 / D4).
@@ -211,6 +216,7 @@ export const useGameStore = defineStore('game', () => {
   let songSeq = 0
   let releaseSeq = 0
   let showSeq = 0
+  let staffSeq = 0
   // Resíduo fracionário de royalty: mantém o caixa inteiro creditando só a parte inteira.
   let royaltyResidual = 0
   // Royalty acumulado desde o último relatório mensal (creditado no caixa; flush no evento).
@@ -226,11 +232,24 @@ export const useGameStore = defineStore('game', () => {
   )
   const songById = (id: string) => songs.value.find((s) => s.id === id)
 
-  // Catálogo de locais com estado de desbloqueio derivado da reputação + fãs (0016 slice 1).
+  // Contagem de equipe por papel (0013) — base do gate de locais e do custo mensal.
+  const staffCounts = computed(() => staffCountsByRole(hiredStaff.value))
+
+  // Catálogo de locais: desbloqueio por reputação+fãs (0016 slice 1) + gate de equipe (0013).
   const venueCatalog = computed(() =>
     VENUES.map((venue) => {
       const stat = { reputation: stats.value.reputation, fans: stats.value.fans }
-      return { venue, unlocked: isVenueUnlocked(venue, stat), missing: missingRequirement(venue, stat) }
+      const unlocked = isVenueUnlocked(venue, stat)
+      const staffShortfall = venueStaffShortfall(venue, staffCounts.value)
+      const staffOk = staffShortfall.length === 0
+      return {
+        venue,
+        unlocked,
+        missing: missingRequirement(venue, stat),
+        staffShortfall,
+        staffOk,
+        bookable: unlocked && staffOk, // pode agendar: desbloqueado E com a equipe exigida
+      }
     }),
   )
 
@@ -278,6 +297,11 @@ export const useGameStore = defineStore('game', () => {
     Math.round(members.value.length * MEMBER_BASE_MONTHLY_COST * (1 + stats.value.reputation / 100)),
   )
 
+  // Salário mensal da equipe contratada (feature 0013): soma dos salários dos papéis.
+  const monthlyStaffCost = computed(() =>
+    hiredStaff.value.reduce((sum, m) => sum + getStaffRole(m.role).monthlySalary, 0),
+  )
+
   // Royalty pago no próximo turno (soma dos lançamentos ativos) — receita por dia (D4).
   const royaltyIncomePerTurn = computed(() =>
     Math.round(releases.value.reduce((sum, r) => sum + (r.currentRoyalty ?? 0), 0)),
@@ -304,12 +328,14 @@ export const useGameStore = defineStore('game', () => {
     releases.value = []
     activeActions.value = []
     scheduledShows.value = []
+    hiredStaff.value = []
     inactiveDays.value = 0
     royaltiesEarnedTotal.value = 0
     eventSeq = 0
     songSeq = 0
     releaseSeq = 0
     showSeq = 0
+    staffSeq = 0
     royaltyResidual = 0
     pendingRoyalty = 0
     turn.value = 1
@@ -574,7 +600,7 @@ export const useGameStore = defineStore('game', () => {
   // Cobra os custos mensais (membros) por cada virada de mês cruzada no avanço.
   function chargeMonthlyCosts(oldTurn: number, newTurn: number) {
     for (let i = 0; i < monthsCrossed(oldTurn, newTurn); i++) {
-      const cost = monthlyMemberCost.value
+      const cost = monthlyMemberCost.value + monthlyStaffCost.value // banda + equipe (0013)
       if (cost > 0) {
         applyStatDelta({ cash: -cost })
         logEvent('negotiation', 'Custos mensais da banda.', [
@@ -738,6 +764,13 @@ export const useGameStore = defineStore('game', () => {
     if (!isVenueUnlocked(venue, stat)) {
       return { ok: false, reason: `Local travado. Requer ${missingRequirement(venue, stat)}.` }
     }
+    // Gate de equipe (0013 slice 2 / Playtest 05 ponto 7): locais maiores exigem crew.
+    if (!venueStaffSatisfied(venue, staffCounts.value)) {
+      const falta = venueStaffShortfall(venue, staffCounts.value)
+        .map((s) => `${s.need} ${getStaffRole(s.role).label.toLowerCase()}`)
+        .join(' · ')
+      return { ok: false, reason: `Falta equipe para esse local: ${falta}.` }
+    }
     // 1 show por vez até a turnê liberar agendar vários (Playtest 05 ponto 8).
     if (!canBookMultipleShows.value && scheduledShows.value.length >= 1) {
       return { ok: false, reason: 'Só um show por vez até liberar a turnê.' }
@@ -750,6 +783,24 @@ export const useGameStore = defineStore('game', () => {
     }
     scheduledShows.value.push({ id: String(++showSeq), venueId, turnDue })
     return { ok: true }
+  }
+
+  // Contrata um papel de staff (0013 slice 1): cobra o custo único na hora; o salário
+  // mensal entra no custo da virada de mês. Caixa pode ficar negativo (dívida — 0003).
+  function hireStaff(role: StaffRole): StartActionResult {
+    const def = getStaffRole(role)
+    hiredStaff.value.push({ id: String(++staffSeq), role })
+    applyStatDelta({ cash: -def.hireCost })
+    logEvent('negotiation', `Contratou: ${def.label}.`, [{ label: `-R$ ${def.hireCost}`, tone: 'neg' }])
+    return { ok: true }
+  }
+
+  // Dispensa um membro da equipe (encerra o salário a partir do próximo mês).
+  function fireStaff(id: string) {
+    const member = hiredStaff.value.find((m) => m.id === id)
+    if (!member) return
+    hiredStaff.value = hiredStaff.value.filter((m) => m.id !== id)
+    logEvent('negotiation', `Dispensou: ${getStaffRole(member.role).label}.`)
   }
 
   // Salta o relógio até a próxima conclusão de ação (1 dia se nada estiver ativo).
@@ -768,6 +819,7 @@ export const useGameStore = defineStore('game', () => {
     releases.value = []
     activeActions.value = []
     scheduledShows.value = []
+    hiredStaff.value = []
     inactiveDays.value = 0
     royaltiesEarnedTotal.value = 0
     outcome.value = null
@@ -776,6 +828,7 @@ export const useGameStore = defineStore('game', () => {
     songSeq = 0
     releaseSeq = 0
     showSeq = 0
+    staffSeq = 0
     royaltyResidual = 0
     pendingRoyalty = 0
     turn.value = 0
@@ -831,6 +884,11 @@ export const useGameStore = defineStore('game', () => {
     scheduledShows,
     scheduleShow,
     canBookMultipleShows,
+    hiredStaff,
+    staffCounts,
+    monthlyStaffCost,
+    hireStaff,
+    fireStaff,
     activeActions,
     isGameStarted,
     isFatigued,

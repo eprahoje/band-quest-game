@@ -29,7 +29,7 @@
         <span class="venue-row__tier">{{ VENUE_TIER_LABEL[entry.venue.tier] }}</span>
         <span class="venue-row__name">{{ entry.venue.name }}</span>
         <span class="venue-row__cap">{{ entry.venue.capacity.toLocaleString('pt-BR') }} lugares · ingresso R$ {{ entry.venue.ticketPrice }}</span>
-        <template v-if="entry.unlocked">
+        <template v-if="entry.bookable">
           <span class="venue-row__book">Agendar:</span>
           <button
             v-for="lead in LEAD_OPTIONS"
@@ -42,7 +42,8 @@
             {{ lead.label }}
           </button>
         </template>
-        <span v-else class="venue-row__req">🔒 Requer {{ entry.missing }}</span>
+        <span v-else-if="!entry.unlocked" class="venue-row__req">🔒 Requer {{ entry.missing }}</span>
+        <span v-else class="venue-row__req">🔒 Requer equipe: {{ staffReqLabel(entry.staffShortfall) }}</span>
       </li>
     </ul>
   </CollapsibleSection>
@@ -52,10 +53,15 @@
 import { computed, ref } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
-import { VENUE_TIER_LABEL, getVenue } from '@/data/venues'
+import { VENUE_TIER_LABEL, getVenue, type StaffShortfallItem } from '@/data/venues'
+import { getStaffRole } from '@/data/staff'
 
 const store = useGameStore()
 const unlockedCount = computed(() => store.venueCatalog.filter((e) => e.unlocked).length)
+
+function staffReqLabel(shortfall: StaffShortfallItem[]): string {
+  return shortfall.map((s) => `${s.need} ${getStaffRole(s.role).label.toLowerCase()}`).join(' · ')
+}
 
 // Limite "1 show por vez até a turnê" (Playtest 05 ponto 8).
 const atShowLimit = computed(() => !store.canBookMultipleShows && store.scheduledShows.length >= 1)
