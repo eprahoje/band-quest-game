@@ -35,13 +35,19 @@ describe('venues (feature 0016, slice 1)', () => {
     expect(caps).toEqual(sorted) // já está em ordem crescente de porte
   })
 
-  it('the bar needs no crew; the casa needs a roadie (0013 gate)', () => {
+  it('the bar needs no crew; the casa needs a roadie (gate por conjunto)', () => {
     const bar = getVenue('bar')
     expect(venueStaffSatisfied(bar, {})).toBe(true)
 
-    const casa = getVenue('casa') // requiredStaff { roadie: 1 }
+    const casa = getVenue('casa') // requiredStaff ['roadie']
     expect(venueStaffSatisfied(casa, {})).toBe(false)
-    expect(venueStaffShortfall(casa, {})).toEqual([{ role: 'roadie', need: 1 }])
+    expect(venueStaffShortfall(casa, {})).toEqual(['roadie'])
     expect(venueStaffSatisfied(casa, { roadie: 1 })).toBe(true)
+  })
+
+  it('the ginásio demands a distinct crew set, not duplicates (0013 it-03 / D9)', () => {
+    const g = getVenue('ginasio') // ['roadie','sound-tech','lighting-tech']
+    expect(venueStaffShortfall(g, { roadie: 1 })).toEqual(['sound-tech', 'lighting-tech'])
+    expect(venueStaffSatisfied(g, { roadie: 1, 'sound-tech': 1, 'lighting-tech': 1 })).toBe(true)
   })
 })

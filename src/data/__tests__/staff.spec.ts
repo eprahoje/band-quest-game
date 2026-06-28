@@ -2,9 +2,21 @@ import { describe, it, expect } from 'vitest'
 import { STAFF_ROLES, getStaffRole, staffCountsByRole, type StaffMember } from '@/data/staff'
 
 describe('staff (feature 0013, slice 1)', () => {
-  it('has the four initial roles (D1)', () => {
-    const roles = STAFF_ROLES.map((r) => r.role).sort()
-    expect(roles).toEqual(['driver', 'manager', 'roadie', 'vocal-coach'])
+  it('has the expanded role catalog (D1 + D8: cargos únicos)', () => {
+    const roles = STAFF_ROLES.map((r) => r.role)
+    expect(roles).toHaveLength(8)
+    for (const r of [
+      'manager',
+      'vocal-coach',
+      'roadie',
+      'sound-tech',
+      'lighting-tech',
+      'driver',
+      'security',
+      'stage-manager',
+    ]) {
+      expect(roles).toContain(r)
+    }
   })
 
   it('each role has a hire cost and a monthly salary (D2)', () => {

@@ -9,23 +9,20 @@
       Salário mensal da equipe: <strong>R$ {{ store.monthlyStaffCost }}</strong>
     </p>
 
-    <ul v-if="store.hiredStaff.length" class="staff-list">
-      <li v-for="m in store.hiredStaff" :key="m.id" class="staff-row">
-        <span class="staff-row__name">{{ roleDef(m.role).label }}</span>
-        <span class="staff-row__pay">R$ {{ roleDef(m.role).monthlySalary }}/mês</span>
-        <button class="staff-btn staff-btn--ghost" type="button" @click="store.fireStaff(m.id)">
-          Dispensar
-        </button>
-      </li>
-    </ul>
-
-    <p class="staff__sub">Contratar</p>
     <ul class="staff-list">
-      <li v-for="role in STAFF_ROLES" :key="role.role" class="staff-row staff-row--hire">
+      <li v-for="role in STAFF_ROLES" :key="role.role" class="staff-row">
         <span class="staff-row__name">{{ role.label }}</span>
         <span class="staff-row__desc">{{ role.description }}</span>
-        <span class="staff-row__pay">R$ {{ role.hireCost }} + R$ {{ role.monthlySalary }}/mês</span>
-        <button class="staff-btn" type="button" @click="store.hireStaff(role.role)">Contratar</button>
+        <template v-if="hiredId(role.role)">
+          <span class="staff-row__pay staff-row__pay--on">Contratado · R$ {{ role.monthlySalary }}/mês</span>
+          <button class="staff-btn staff-btn--ghost" type="button" @click="store.fireStaff(hiredId(role.role)!)">
+            Dispensar
+          </button>
+        </template>
+        <template v-else>
+          <span class="staff-row__pay">R$ {{ role.hireCost }} + R$ {{ role.monthlySalary }}/mês</span>
+          <button class="staff-btn" type="button" @click="store.hireStaff(role.role)">Contratar</button>
+        </template>
       </li>
     </ul>
   </CollapsibleSection>
@@ -34,11 +31,12 @@
 <script setup lang="ts">
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
-import { STAFF_ROLES, getStaffRole, type StaffRole } from '@/data/staff'
+import { STAFF_ROLES, type StaffRole } from '@/data/staff'
 
 const store = useGameStore()
-function roleDef(role: StaffRole) {
-  return getStaffRole(role)
+// id da instância contratada deste cargo (ou undefined) — cargos são únicos (D7).
+function hiredId(role: StaffRole): string | undefined {
+  return store.hiredStaff.find((m) => m.role === role)?.id
 }
 </script>
 
@@ -97,6 +95,10 @@ function roleDef(role: StaffRole) {
   font-size: var(--bq-text-xs);
   font-family: var(--bq-font-mono);
   color: var(--bq-text-muted);
+}
+
+.staff-row__pay--on {
+  color: var(--bq-positive);
 }
 
 .staff-btn {

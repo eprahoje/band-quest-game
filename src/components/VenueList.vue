@@ -62,21 +62,16 @@ import { computed, ref } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
 import { VENUE_TIER_LABEL, getVenue, type Venue } from '@/data/venues'
-import { getStaffRole, type StaffRole } from '@/data/staff'
+import { getStaffRole } from '@/data/staff'
 
 const store = useGameStore()
 const unlockedCount = computed(() => store.venueCatalog.filter((e) => e.unlocked).length)
 
-// Requisito de equipe: mostra o TOTAL exigido e quanto a banda já tem (Playtest 06 ponto 7 —
-// antes mostrava só o que faltava, dando a impressão de pedir "1" quando o total era 2).
+// Requisito de equipe: lista os cargos exigidos com ✓ (a banda tem) / ✗ (falta) — cargos
+// são únicos (0013 it-03), então é presença, não contagem (resolve o Playtest 06 ponto 7).
 function staffReqLabel(venue: Venue): string {
-  const req = venue.requiredStaff ?? {}
-  return (Object.keys(req) as StaffRole[])
-    .map((role) => {
-      const need = req[role] ?? 0
-      const have = store.staffCounts[role] ?? 0
-      return `${need} ${getStaffRole(role).label.toLowerCase()} (tem ${have})`
-    })
+  return (venue.requiredStaff ?? [])
+    .map((role) => `${getStaffRole(role).label.toLowerCase()} ${store.staffCounts[role] ? '✓' : '✗'}`)
     .join(' · ')
 }
 

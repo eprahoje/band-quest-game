@@ -655,6 +655,13 @@ describe('game store', () => {
       expect(store.stats.cash).toBe(cashAfterHire - 600)
     })
 
+    it('hires each role at most once (cargos únicos — 0013 it-03 / D7)', () => {
+      const store = freshGame()
+      expect(store.hireStaff('roadie').ok).toBe(true)
+      expect(store.hireStaff('roadie').ok).toBe(false) // já contratado
+      expect(store.hiredStaff.filter((m) => m.role === 'roadie')).toHaveLength(1)
+    })
+
     it('fires staff (stops the salary)', () => {
       const store = freshGame()
       store.hireStaff('roadie')

@@ -767,7 +767,7 @@ export const useGameStore = defineStore('game', () => {
     // Gate de equipe (0013 slice 2 / Playtest 05 ponto 7): locais maiores exigem crew.
     if (!venueStaffSatisfied(venue, staffCounts.value)) {
       const falta = venueStaffShortfall(venue, staffCounts.value)
-        .map((s) => `${s.need} ${getStaffRole(s.role).label.toLowerCase()}`)
+        .map((role) => getStaffRole(role).label.toLowerCase())
         .join(' · ')
       return { ok: false, reason: `Falta equipe para esse local: ${falta}.` }
     }
@@ -789,6 +789,8 @@ export const useGameStore = defineStore('game', () => {
   // mensal entra no custo da virada de mês. Caixa pode ficar negativo (dívida — 0003).
   function hireStaff(role: StaffRole): StartActionResult {
     const def = getStaffRole(role)
+    // Cargos são únicos (0013 it-03 / D7): não contrata o mesmo papel duas vezes.
+    if ((staffCounts.value[role] ?? 0) >= 1) return { ok: false, reason: 'Cargo já contratado.' }
     hiredStaff.value.push({ id: String(++staffSeq), role })
     applyStatDelta({ cash: -def.hireCost })
     logEvent('negotiation', `Contratou: ${def.label}.`, [{ label: `-R$ ${def.hireCost}`, tone: 'neg' }])
