@@ -600,6 +600,36 @@ describe('game store', () => {
     })
   })
 
+  describe('cancelar ação e show (Playtest 06 ponto 2)', () => {
+    function freshGame() {
+      const store = useGameStore()
+      store.setRandomSource(() => 0.5)
+      store.startGame({ bandName: 'B', genre: 'Rock', originTrait: 'Garagem' })
+      return store
+    }
+
+    it('cancela uma ação em andamento e devolve as músicas reservadas', () => {
+      const store = freshGame()
+      store.startAction('compose')
+      store.advanceToNextCompletion()
+      expect(store.availableSongs).toHaveLength(1)
+      const songId = store.availableSongs[0]!.id
+      store.startAction('record-single', undefined, { songIds: [songId] })
+      expect(store.availableSongs).toHaveLength(0) // reservada (released)
+      store.cancelAction('record-single')
+      expect(store.activeActions).toHaveLength(0)
+      expect(store.availableSongs).toHaveLength(1) // devolvida ao cancelar
+    })
+
+    it('cancela um show agendado', () => {
+      const store = freshGame()
+      store.scheduleShow('bar', 7)
+      expect(store.scheduledShows).toHaveLength(1)
+      store.cancelScheduledShow(store.scheduledShows[0]!.id)
+      expect(store.scheduledShows).toHaveLength(0)
+    })
+  })
+
   describe('staff and crew (feature 0013, slices 1 e 2)', () => {
     function freshGame() {
       const store = useGameStore()

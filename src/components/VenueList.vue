@@ -12,6 +12,14 @@
         <li v-for="s in store.scheduledShows" :key="s.id" class="upcoming__item">
           <span class="upcoming__venue">{{ venueName(s.venueId) }}</span>
           <span class="upcoming__date">{{ dateLabel(s.turnDue) }}</span>
+          <button
+            class="upcoming__cancel"
+            type="button"
+            aria-label="Cancelar show"
+            @click="store.cancelScheduledShow(s.id)"
+          >
+            ✕
+          </button>
         </li>
       </ul>
     </div>
@@ -43,7 +51,7 @@
           </button>
         </template>
         <span v-else-if="!entry.unlocked" class="venue-row__req">🔒 Requer {{ entry.missing }}</span>
-        <span v-else class="venue-row__req">🔒 Requer equipe: {{ staffReqLabel(entry.staffShortfall) }}</span>
+        <span v-else class="venue-row__req">🔒 Requer equipe: {{ staffReqLabel(entry.venue) }}</span>
       </li>
     </ul>
   </CollapsibleSection>
@@ -53,14 +61,23 @@
 import { computed, ref } from 'vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import { useGameStore } from '@/stores/game'
-import { VENUE_TIER_LABEL, getVenue, type StaffShortfallItem } from '@/data/venues'
-import { getStaffRole } from '@/data/staff'
+import { VENUE_TIER_LABEL, getVenue, type Venue } from '@/data/venues'
+import { getStaffRole, type StaffRole } from '@/data/staff'
 
 const store = useGameStore()
 const unlockedCount = computed(() => store.venueCatalog.filter((e) => e.unlocked).length)
 
-function staffReqLabel(shortfall: StaffShortfallItem[]): string {
-  return shortfall.map((s) => `${s.need} ${getStaffRole(s.role).label.toLowerCase()}`).join(' · ')
+// Requisito de equipe: mostra o TOTAL exigido e quanto a banda já tem (Playtest 06 ponto 7 —
+// antes mostrava só o que faltava, dando a impressão de pedir "1" quando o total era 2).
+function staffReqLabel(venue: Venue): string {
+  const req = venue.requiredStaff ?? {}
+  return (Object.keys(req) as StaffRole[])
+    .map((role) => {
+      const need = req[role] ?? 0
+      const have = store.staffCounts[role] ?? 0
+      return `${need} ${getStaffRole(role).label.toLowerCase()} (tem ${have})`
+    })
+    .join(' · ')
 }
 
 // Limite "1 show por vez até a turnê" (Playtest 05 ponto 8).
@@ -129,6 +146,21 @@ function dateLabel(turn: number): string {
   margin-left: auto;
   font-size: var(--bq-text-xs);
   color: var(--bq-text-muted);
+}
+
+.upcoming__cancel {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--bq-text-faint);
+  cursor: pointer;
+  font-size: var(--bq-text-sm);
+  padding: 0 var(--bq-space-1);
+  transition: color var(--bq-dur-base) var(--bq-ease);
+}
+
+.upcoming__cancel:hover {
+  color: var(--bq-ember);
 }
 
 .book-error {

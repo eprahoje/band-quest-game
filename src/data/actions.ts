@@ -216,7 +216,10 @@ export function resolveOutcome(
     if (base > 0 && key !== 'fatigue') v *= quality * effort.outcomeModifier
     // cachê (cash positivo) escala com a reputação nas ações marcadas (Playtest 04 ponto 4)
     if (key === 'cash' && base > 0 && action.cashScalesWithReputation) v *= repCashMult
-    v *= factor
+    // Custos (cash negativo) são PREVISÍVEIS — sem variância (Playtest 06 ponto 3); a
+    // variância leve só afeta os ganhos. Assim o "Custo base: R$X" do card bate com o cobrado.
+    const isCost = key === 'cash' && base < 0
+    if (!isCost) v *= factor
     result[key] = Math.round(v)
   }
   return result

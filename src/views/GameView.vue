@@ -148,6 +148,14 @@
           <span class="progress-item__remaining">
             {{ a.turnsRemaining }}/{{ a.totalTurns }} dias
           </span>
+          <button
+            class="progress-item__cancel"
+            type="button"
+            aria-label="Cancelar ação"
+            @click="store.cancelAction(a.actionId)"
+          >
+            ✕
+          </button>
         </li>
       </ul>
     </CollapsibleSection>
@@ -641,6 +649,21 @@ function advance() {
   font-family: var(--bq-font-mono);
   font-size: var(--bq-text-xs);
   color: var(--bq-spotlight);
+}
+
+.progress-item__cancel {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--bq-text-faint);
+  cursor: pointer;
+  font-size: var(--bq-text-sm);
+  padding: 0 var(--bq-space-1);
+  transition: color var(--bq-dur-base) var(--bq-ease);
+}
+
+.progress-item__cancel:hover {
+  color: var(--bq-ember);
 }
 
 .actions__grid {

@@ -85,6 +85,14 @@ describe('resolveOutcome', () => {
     expect(out.cash).toBe(-640) // -400 * 1.6 (custo escala pelo costModifier)
   })
 
+  it('does not apply variance to costs — custos previsíveis (Playtest 06 ponto 3)', () => {
+    const mkt = getAction('marketing') // cash -300, variance 0.2
+    const low = resolveOutcome(mkt, resolveEffort(mkt), { rng: () => 0 })
+    const high = resolveOutcome(mkt, resolveEffort(mkt), { rng: () => 1 })
+    expect(low.cash).toBe(-300) // sem variância no custo, mesmo no extremo do rng
+    expect(high.cash).toBe(-300)
+  })
+
   it('applies variance within the declared bounds', () => {
     const action = getAction('tour') // variance 0.25
     const low = resolveOutcome(action, resolveEffort(action), { rng: () => 0, qualityModifier: 1 })

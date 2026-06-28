@@ -803,6 +803,24 @@ export const useGameStore = defineStore('game', () => {
     logEvent('negotiation', `Dispensou: ${getStaffRole(member.role).label}.`)
   }
 
+  // Cancela uma ação em andamento ANTES de avançar o tempo (Playtest 06 ponto 2). Devolve
+  // os insumos reservados (músicas voltam a 'composed'; singles só são marcados ao concluir).
+  function cancelAction(actionId: string) {
+    const idx = activeActions.value.findIndex((a) => a.actionId === actionId)
+    if (idx < 0) return
+    const a = activeActions.value[idx]!
+    for (const sid of a.consumedSongIds ?? []) {
+      const song = songById(sid)
+      if (song) song.status = 'composed'
+    }
+    activeActions.value.splice(idx, 1)
+  }
+
+  // Cancela um show agendado (compromisso ainda não disparado).
+  function cancelScheduledShow(id: string) {
+    scheduledShows.value = scheduledShows.value.filter((s) => s.id !== id)
+  }
+
   // Salta o relógio até a próxima conclusão de ação (1 dia se nada estiver ativo).
   function advanceToNextCompletion() {
     advanceDays(nextCompletionDays.value)
@@ -889,6 +907,8 @@ export const useGameStore = defineStore('game', () => {
     monthlyStaffCost,
     hireStaff,
     fireStaff,
+    cancelAction,
+    cancelScheduledShow,
     activeActions,
     isGameStarted,
     isFatigued,
